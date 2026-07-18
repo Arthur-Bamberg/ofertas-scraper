@@ -1,0 +1,9 @@
+#!/usr/bin/env bash
+# Runs the full Go test suite before allowing a commit.
+set -euo pipefail
+
+root="$(git rev-parse --show-toplevel)"
+cd "$root"
+
+echo "pre-commit: go test ./..."
+go test ./...

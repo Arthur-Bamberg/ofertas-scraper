@@ -51,3 +51,7 @@ _Avoid_: export com erro, erro de IA, rejeição
 **Artefato**:
 Material obtido ou gerado em uma tentativa de processamento de um Documento e retido para debug: PDF original, imagens enviadas ao Extrator, resposta bruta do Extrator e resultado validado (Ofertas e Falhas de Extração). Cada reprocessamento acrescenta uma nova tentativa; tentativas anteriores permanecem. Ofertas e Falhas de Extração persistidas no estado atual do Documento são substituídas na nova tentativa — o histórico de tentativas vive nos Artefatos. Hoje em armazenamento local; depois em bucket.
 _Avoid_: arquivo, blob, export, attachment, log
+
+## Qualidade local
+
+Antes de cada commit, o hook versionado em `.githooks/pre-commit` executa `go test ./...` (equivalente a Husky em projetos Node). Instalar uma vez por clone com `./scripts/install-git-hooks.sh`. Detalhes em [`AGENTS.md`](./AGENTS.md) e ADR 0024.

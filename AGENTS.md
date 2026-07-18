@@ -39,6 +39,8 @@ schemas/oferta.json           # Extrator candidate / Oferta contract
 schemas/extracao.json         # Extrator root response (list of candidates)
 prompts/extrator.txt          # stable system prompt (bump only when explicitly versioning)
 docker-compose.yml            # Redis + SRH
+.githooks/                    # versioned Git hooks (pre-commit → go test)
+scripts/install-git-hooks.sh  # once per clone: core.hooksPath=.githooks
 CONTEXT.md
 docs/adr/
 ```
@@ -118,6 +120,16 @@ Store via `ArtefatoStore` only — never write files ad hoc from use cases.
 - Artefatos default to a local directory (e.g. `./.data/artefatos`)
 - Cron example: `0 8 * * *` with `TZ=America/Sao_Paulo` calling the CLI once
 
+### Git hooks (pre-commit tests)
+
+Go has no Husky. This repo versions hooks under `.githooks/` and points Git at them once per clone (ADR 0024):
+
+```bash
+./scripts/install-git-hooks.sh
+```
+
+After that, every `git commit` runs `go test ./...` and aborts on failure. Do not use `--no-verify` unless explicitly required.
+
 ### Suggested env vars
 
 ```
@@ -143,6 +155,7 @@ CLI: `ofertas-scraper seed` (upsert Mercados/Fontes from `SEED_PATH`) then `ofer
 - Keep job orchestration in `application`
 - Keep prompt + schema in sync; only introduce versioned filenames when explicitly asked to bump the Extrator contract (ADR 0014)
 - Prefer small, sequential changes with tests around domain validation
+- Install Git hooks after cloning (`./scripts/install-git-hooks.sh`) so pre-commit runs `go test ./...`
 
 **Don't**
 
@@ -152,6 +165,7 @@ CLI: `ofertas-scraper seed` (upsert Mercados/Fontes from `SEED_PATH`) then `ofer
 - Hardcode Fonte URLs (they live in Redis)
 - Parallelize Fontes/Documentos in the MVP without an explicit decision
 - Commit secrets (`.env`, API keys)
+- Skip pre-commit with `--no-verify` unless the user explicitly asks
 
 ## Pipeline reference
 
