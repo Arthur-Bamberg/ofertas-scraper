@@ -13,53 +13,54 @@ type DocumentoID string
 type OfertaID string
 
 type Mercado struct {
-	ID   MercadoID
-	Nome string
+	ID   MercadoID `json:"id"`
+	Nome string    `json:"nome"`
 }
 
 type Fonte struct {
-	ID                             FonteID
-	MercadoID                      MercadoID
-	URL                            string
-	FiltroNomeDocumento            string // optional; empty = no filter
-	FallbackDataExpiracaoFilename  bool   // default false (ADR 0013)
+	ID                            FonteID   `json:"id"`
+	MercadoID                     MercadoID `json:"mercadoId"`
+	URL                           string    `json:"url"`
+	FiltroNomeDocumento           string    `json:"filtroNomeDocumento"`
+	FallbackDataExpiracaoFilename bool      `json:"fallbackDataExpiracaoFilename"`
 }
 
 type Produto struct {
-	ID         ProdutoID
-	Nome       string
-	NomeNorm   string
-	Categorias []string
+	ID         ProdutoID `json:"id"`
+	Nome       string    `json:"nome"`
+	NomeNorm   string    `json:"nomeNorm"`
+	Categorias []string  `json:"categorias"`
 }
 
 type Marca struct {
-	ID       MarcaID
-	Nome     string
-	NomeNorm string
+	ID       MarcaID `json:"id"`
+	Nome     string  `json:"nome"`
+	NomeNorm string  `json:"nomeNorm"`
 }
 
 type Documento struct {
-	ID          DocumentoID
-	FonteID     FonteID
-	MercadoID   MercadoID
-	Filename    string
-	Dia         string // YYYY-MM-DD America/Sao_Paulo discovery day
-	Estado      EstadoDocumento
-	Atualizado  time.Time
+	ID         DocumentoID     `json:"id"`
+	FonteID    FonteID         `json:"fonteId"`
+	MercadoID  MercadoID       `json:"mercadoId"`
+	Filename   string          `json:"filename"`
+	Dia        string          `json:"dia"`
+	Estado     EstadoDocumento `json:"estado"`
+	UltimoErro string          `json:"ultimoErro,omitempty"`
+	Atualizado time.Time       `json:"atualizado"`
 }
 
 // Oferta is the persisted price observation (after match-or-create).
 type Oferta struct {
-	ID            OfertaID
-	DocumentoID   DocumentoID
-	ProdutoID     ProdutoID
-	MarcaID       *MarcaID // optional (ADR 0015)
-	MercadoID     MercadoID
-	Valor         float64
-	Quantidade    float64
-	Medida        Medida
-	DataExpiracao string
-	Promocao      *Promocao
+	ID            OfertaID  `json:"id"`
+	DocumentoID   DocumentoID `json:"documentoId"`
+	ProdutoID     ProdutoID `json:"produtoId"`
+	MarcaID       *MarcaID  `json:"marcaId,omitempty"`
+	MercadoID     MercadoID `json:"mercadoId"`
+	Valor         float64   `json:"valor"`
+	Quantidade    float64   `json:"quantidade"`
+	Medida        Medida    `json:"medida"`
+	DataExpiracao string    `json:"dataExpiracao"`
+	Promocao      *Promocao `json:"promocao,omitempty"`
 }
 
 type MercadoRepository interface {
@@ -89,7 +90,7 @@ type DocumentoRepository interface {
 }
 
 type OfertaRepository interface {
-	SaveAll(ctx context.Context, ofertas []Oferta) error
+	SaveAll(ctx context.Context, documentoID DocumentoID, ofertas []Oferta) error
 	ListByDocumento(ctx context.Context, documentoID DocumentoID) ([]Oferta, error)
 }
 
@@ -106,16 +107,22 @@ type Extrator interface {
 	Extract(ctx context.Context, images []PageImage) (candidatos []CandidatoOferta, raw []byte, err error)
 }
 
+// PDFDescoberto is a PDF link found on a Fonte page (ADR 0020).
+type PDFDescoberto struct {
+	Filename string // last path segment — Documento identity
+	URL      string // absolute download URL
+}
+
 type ArtefatoStore interface {
-	SavePDF(ctx context.Context, doc Documento, pdf []byte) error
-	SaveImages(ctx context.Context, doc Documento, images []PageImage) error
-	SaveRawExtrator(ctx context.Context, doc Documento, raw []byte) error
-	SaveValidated(ctx context.Context, doc Documento, ofertas []Oferta, falhas []FalhaExtracao) error
+	SavePDF(ctx context.Context, doc Documento, tentativa string, pdf []byte) error
+	SaveImages(ctx context.Context, doc Documento, tentativa string, images []PageImage) error
+	SaveRawExtrator(ctx context.Context, doc Documento, tentativa string, raw []byte) error
+	SaveValidated(ctx context.Context, doc Documento, tentativa string, ofertas []Oferta, falhas []FalhaExtracao) error
 }
 
 type FonteClient interface {
-	DiscoverPDFs(ctx context.Context, fonte Fonte) (filenames []string, err error)
-	DownloadPDF(ctx context.Context, fonte Fonte, filename string) (pdf []byte, err error)
+	DiscoverPDFs(ctx context.Context, fonte Fonte) ([]PDFDescoberto, error)
+	DownloadPDF(ctx context.Context, url string) (pdf []byte, err error)
 }
 
 type Rasterizer interface {

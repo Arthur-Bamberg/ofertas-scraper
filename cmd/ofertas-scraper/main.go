@@ -1,21 +1,32 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"os"
+
+	"ofertas-scraper/internal/presentation"
 )
 
 func main() {
 	if len(os.Args) < 2 {
-		fmt.Fprintln(os.Stderr, "usage: ofertas-scraper run")
+		fmt.Fprintln(os.Stderr, "usage: ofertas-scraper <run|seed>")
 		os.Exit(2)
 	}
+	env := presentation.LoadEnv()
+	ctx := context.Background()
+	var err error
 	switch os.Args[1] {
 	case "run":
-		fmt.Fprintln(os.Stderr, "run: daily job wiring not implemented yet (domain + ValidarExtracao ready)")
-		os.Exit(1)
+		err = presentation.RunDaily(ctx, env)
+	case "seed":
+		err = presentation.RunSeed(ctx, env)
 	default:
 		fmt.Fprintf(os.Stderr, "unknown command %q\n", os.Args[1])
 		os.Exit(2)
+	}
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
 	}
 }

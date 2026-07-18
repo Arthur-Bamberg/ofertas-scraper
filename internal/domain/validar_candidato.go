@@ -24,14 +24,14 @@ const (
 
 // CandidatoOferta is the Extrator candidate before match-or-create.
 type CandidatoOferta struct {
-	Produto       string
-	Marca         string // empty when omitted
-	Categorias    []string
-	Valor         float64
-	Quantidade    float64
-	Medida        string
-	DataExpiracao string
-	Promocao      *Promocao
+	Produto       string    `json:"produto"`
+	Marca         string    `json:"marca,omitempty"`
+	Categorias    []string  `json:"categorias,omitempty"`
+	Valor         float64   `json:"valor"`
+	Quantidade    float64   `json:"quantidade"`
+	Medida        string    `json:"medida"`
+	DataExpiracao string    `json:"dataExpiracao"`
+	Promocao      *Promocao `json:"promocao,omitempty"`
 }
 
 // OfertaValidada is a candidate that passed domain validation (labels, not ids).
@@ -47,17 +47,17 @@ type OfertaValidada struct {
 }
 
 type Promocao struct {
-	Leve               *float64
-	Pague              *float64
-	QuantidadePromocao *float64
-	PromocaoCartao     *bool
-	ValorPromocional   float64
+	Leve               *float64 `json:"leve,omitempty"`
+	Pague              *float64 `json:"pague,omitempty"`
+	QuantidadePromocao *float64 `json:"quantidadePromocao,omitempty"`
+	PromocaoCartao     *bool    `json:"promocaoCartao,omitempty"`
+	ValorPromocional   float64  `json:"valorPromocional"`
 }
 
 type FalhaExtracao struct {
-	Codigo    string
-	Detalhe   string
-	Candidato CandidatoOferta
+	Codigo    string          `json:"codigo"`
+	Detalhe   string          `json:"detalhe,omitempty"`
+	Candidato CandidatoOferta `json:"candidato"`
 }
 
 func ValidarCandidato(c CandidatoOferta) (OfertaValidada, *FalhaExtracao) {

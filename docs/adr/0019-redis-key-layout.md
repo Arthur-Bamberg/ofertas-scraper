@@ -1,0 +1,3 @@
+# Redis key layout: JSON entities plus secondary indexes
+
+Persistence uses plain Redis string values holding JSON documents and minimal secondary indexes — no RedisJSON module. Entity keys are `{tipo}:{id}` (e.g. `produto:{uuid}`). Collection SETs `mercados` and `fontes` hold ids for List. Produto and Marca resolve via `produto:norm:{nomeNorm}` and `marca:norm:{nomeNorm}` → id. Documento identity maps through `documento:id:{fonteId}:{filename}:{dia}` → id. Ofertas and Falhas de Extração for a Documento live in one key each (`ofertas:documento:{documentoId}`, `falhas:documento:{documentoId}`) replaced wholesale on SaveAll (ADR 0017). Chosen over per-field HASHes or one-key-per-Oferta for MVP simplicity on Upstash REST / SRH.

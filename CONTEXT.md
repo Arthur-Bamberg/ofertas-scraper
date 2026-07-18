@@ -21,7 +21,7 @@ Rótulo taxonômico de um Produto para filtrar e agrupar (ex.: mercearia, grãos
 _Avoid_: tipo, variante, tag solta na Oferta
 
 **Fonte**:
-URL configurada e persistida cujo GET retorna (direta ou indiretamente) os nomes dos arquivos PDF a processar; pertence a um Mercado; pode incluir filtro opcional de nomes de Documento e, opt-in, permissão para obter `dataExpiracao` a partir do nome do arquivo quando o Extrator omite a data.
+URL configurada e persistida cuja resposta revela URLs de PDFs (HTML/JS/JSON); o nome do arquivo identifica o Documento e o download usa a URL do link. Pode apontar para página HTML ou endpoint JSON de ofertas. Pertence a um Mercado; pode incluir filtro opcional por regex sobre o nome do Documento e, opt-in, permissão para obter `dataExpiracao` a partir do nome do arquivo quando o Extrator omite a data.
 _Avoid_: Site, link, URL, origem
 
 **Mercado**:
@@ -29,7 +29,7 @@ Identidade comercial (rede ou bandeira) à qual uma Fonte pertence; sujeito da c
 _Avoid_: loja, supermercado, site, Fonte
 
 **Documento**:
-PDF identificado em uma Fonte pelo nome do arquivo e pelo dia da descoberta; rastreado ao longo do processamento (descoberta, rasterização, extração). Estados: descoberto, processando, concluído, parcial, falhou. Sem pelo menos uma Oferta persistida (lista vazia do Extrator ou só Falhas de Extração), o Documento termina em falhou.
+PDF identificado em uma Fonte pelo nome do arquivo e pelo dia da descoberta; rastreado ao longo do processamento (descoberta, rasterização, extração). Estados: descoberto, processando, concluído, parcial, falhou. Sem pelo menos uma Oferta persistida (lista vazia do Extrator ou só Falhas de Extração), o Documento termina em falhou. Em falha dura de processamento (incluindo Extrator indisponível após retentativas), permanece consultável com o motivo do último erro.
 _Avoid_: PDF, arquivo, anexo
 
 **Extrator**:
@@ -49,5 +49,5 @@ Registro de uma tentativa de Oferta que não passou na validação, vinculada ao
 _Avoid_: export com erro, erro de IA, rejeição
 
 **Artefato**:
-Material obtido ou gerado no processamento de um Documento e retido para debug: PDF original, imagens enviadas ao Extrator, resposta bruta do Extrator e resultado validado (Ofertas e Falhas de Extração). Hoje em armazenamento local; depois em bucket.
-_Avoid_: arquivo, blob, export, attachment
+Material obtido ou gerado em uma tentativa de processamento de um Documento e retido para debug: PDF original, imagens enviadas ao Extrator, resposta bruta do Extrator e resultado validado (Ofertas e Falhas de Extração). Cada reprocessamento acrescenta uma nova tentativa; tentativas anteriores permanecem. Ofertas e Falhas de Extração persistidas no estado atual do Documento são substituídas na nova tentativa — o histórico de tentativas vive nos Artefatos. Hoje em armazenamento local; depois em bucket.
+_Avoid_: arquivo, blob, export, attachment, log

@@ -124,11 +124,15 @@ Store via `ArtefatoStore` only — never write files ad hoc from use cases.
 UPSTASH_REDIS_REST_URL=
 UPSTASH_REDIS_REST_TOKEN=
 GEMINI_API_KEY=
+EXTRATOR_STUB=1
+SEED_PATH=./seed/fontes.json
 ARTEFATO_ROOT=./.data/artefatos
 RASTER_MAX_EDGE_PX=1280
 RASTER_JPEG_QUALITY=80
 TZ=America/Sao_Paulo
 ```
+
+CLI: `ofertas-scraper seed` (upsert Mercados/Fontes from `SEED_PATH`) then `ofertas-scraper run`. Rasterizer needs `pdftoppm` (poppler-utils) on PATH.
 
 ## Agent do's and don'ts
 
