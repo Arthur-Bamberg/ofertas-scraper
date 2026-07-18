@@ -1,8 +1,7 @@
 services:
   redis:
     image: redis:7-alpine
-    ports:
-      - "6379:6379"
+    # No host port — app talks to Redis only via SRH on 8079.
 
   srh:
     image: hiett/serverless-redis-http:latest

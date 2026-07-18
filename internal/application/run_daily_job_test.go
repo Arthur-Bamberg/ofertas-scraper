@@ -257,3 +257,149 @@ func (c *countingExtrator) Extract(ctx context.Context, images []domain.PageImag
 	*c.n++
 	return c.inner.Extract(ctx, images)
 }
+
+func TestRunDailyJob_OnlyFonteID(t *testing.T) {
+	loc, _ := time.LoadLocation("America/Sao_Paulo")
+	now := time.Date(2026, 7, 18, 8, 0, 0, 0, loc)
+	docs := newMemDocs()
+	calls := 0
+
+	deps := application.RunDailyJobDeps{
+		Fontes: &memFontes{items: []domain.Fonte{
+			{ID: "f-skip", MercadoID: "m1"},
+			{ID: "f-run", MercadoID: "m1"},
+		}},
+		Documentos: docs,
+		Produtos:   &memProdutos{},
+		Marcas:     &memMarcas{},
+		Ofertas:    &memOfertas{},
+		Falhas:     &memFalhas{},
+		FonteHTTP: &memFonteHTTP{
+			pdfs: map[string][]domain.PDFDescoberto{
+				"f-skip": {{Filename: "skip.pdf", URL: "u1"}},
+				"f-run":  {{Filename: "run.pdf", URL: "u2"}},
+			},
+			body: []byte("%PDF"),
+		},
+		Raster: raster.Fixed{Pages: []domain.PageImage{{Page: 1, JPEG: []byte{0xff, 0xd8}}}},
+		Extrator: &countingExtrator{
+			inner: extrator.Stub{Candidatos: []domain.CandidatoOferta{{
+				Produto: "Feijão", Valor: 5, Quantidade: 1, Medida: "unidade", DataExpiracao: "2026-07-25",
+			}}},
+			n: &calls,
+		},
+		Artefatos:   memArtefatos{},
+		Dates:       filenamedate.Parser{},
+		Clock:       fixedClock{t: now},
+		Log:         log.New(&bytes.Buffer{}, "", 0),
+		Location:    loc,
+		OnlyFonteID: "f-run",
+	}
+
+	if err := application.RunDailyJob(context.Background(), deps); err != nil {
+		t.Fatal(err)
+	}
+	if calls != 1 {
+		t.Fatalf("extrator calls=%d want 1", calls)
+	}
+	if _, ok, _ := docs.GetByIdentity(context.Background(), "f-skip", "skip.pdf", "2026-07-18"); ok {
+		t.Fatal("skipped fonte should not create documento")
+	}
+	doc, ok, _ := docs.GetByIdentity(context.Background(), "f-run", "run.pdf", "2026-07-18")
+	if !ok || doc.Estado != domain.EstadoConcluido {
+		t.Fatalf("run fonte doc ok=%v estado=%s", ok, doc.Estado)
+	}
+}
+
+func TestRunDailyJob_MaxDocumentos(t *testing.T) {
+	loc, _ := time.LoadLocation("America/Sao_Paulo")
+	now := time.Date(2026, 7, 18, 8, 0, 0, 0, loc)
+	docs := newMemDocs()
+	calls := 0
+
+	deps := application.RunDailyJobDeps{
+		Fontes: &memFontes{items: []domain.Fonte{{ID: "f1", MercadoID: "m1"}}},
+		Documentos: docs,
+		Produtos:   &memProdutos{},
+		Marcas:     &memMarcas{},
+		Ofertas:    &memOfertas{},
+		Falhas:     &memFalhas{},
+		FonteHTTP: &memFonteHTTP{
+			pdfs: map[string][]domain.PDFDescoberto{
+				"f1": {
+					{Filename: "a.pdf", URL: "u1"},
+					{Filename: "b.pdf", URL: "u2"},
+				},
+			},
+			body: []byte("%PDF"),
+		},
+		Raster: raster.Fixed{Pages: []domain.PageImage{{Page: 1, JPEG: []byte{0xff, 0xd8}}}},
+		Extrator: &countingExtrator{
+			inner: extrator.Stub{Candidatos: []domain.CandidatoOferta{{
+				Produto: "Leite", Valor: 4, Quantidade: 1000, Medida: "ml", DataExpiracao: "2026-07-25",
+			}}},
+			n: &calls,
+		},
+		Artefatos:     memArtefatos{},
+		Dates:         filenamedate.Parser{},
+		Clock:         fixedClock{t: now},
+		Log:           log.New(&bytes.Buffer{}, "", 0),
+		Location:      loc,
+		MaxDocumentos: 1,
+	}
+
+	if err := application.RunDailyJob(context.Background(), deps); err != nil {
+		t.Fatal(err)
+	}
+	if calls != 1 {
+		t.Fatalf("extrator calls=%d want 1", calls)
+	}
+	if _, ok, _ := docs.GetByIdentity(context.Background(), "f1", "a.pdf", "2026-07-18"); !ok {
+		t.Fatal("first pdf missing")
+	}
+	if _, ok, _ := docs.GetByIdentity(context.Background(), "f1", "b.pdf", "2026-07-18"); ok {
+		t.Fatal("second pdf should not be processed")
+	}
+}
+
+func TestRunDailyJob_SkipsParcial(t *testing.T) {
+	loc, _ := time.LoadLocation("America/Sao_Paulo")
+	now := time.Date(2026, 7, 18, 8, 0, 0, 0, loc)
+	docs := newMemDocs()
+	_ = docs.Save(context.Background(), domain.Documento{
+		ID: "d1", FonteID: "f1", MercadoID: "m1",
+		Filename: "encarte.pdf", Dia: "2026-07-18", Estado: domain.EstadoParcial,
+	})
+	calls := 0
+
+	deps := application.RunDailyJobDeps{
+		Fontes:     &memFontes{items: []domain.Fonte{{ID: "f1", MercadoID: "m1"}}},
+		Documentos: docs,
+		Produtos:   &memProdutos{},
+		Marcas:     &memMarcas{},
+		Ofertas:    &memOfertas{},
+		Falhas:     &memFalhas{},
+		FonteHTTP: &memFonteHTTP{
+			pdfs: map[string][]domain.PDFDescoberto{"f1": {{Filename: "encarte.pdf", URL: "u"}}},
+			body: []byte("x"),
+		},
+		Raster: raster.Fixed{Pages: []domain.PageImage{{Page: 1, JPEG: []byte{1}}}},
+		Extrator: &countingExtrator{
+			inner: extrator.Stub{Candidatos: []domain.CandidatoOferta{{
+				Produto: "X", Valor: 1, Quantidade: 1, Medida: "unidade", DataExpiracao: "2026-07-25",
+			}}},
+			n: &calls,
+		},
+		Artefatos: memArtefatos{},
+		Dates:     filenamedate.Parser{},
+		Clock:     fixedClock{t: now},
+		Log:       log.New(&bytes.Buffer{}, "", 0),
+		Location:  loc,
+	}
+	if err := application.RunDailyJob(context.Background(), deps); err != nil {
+		t.Fatal(err)
+	}
+	if calls != 0 {
+		t.Fatalf("parcial should not reprocess; calls=%d", calls)
+	}
+}

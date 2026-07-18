@@ -5,8 +5,8 @@ Sistema que coleta PDFs de Fontes de ofertas, rasteriza páginas em imagens, ext
 ## Language
 
 **Oferta**:
-Observação de preço extraída de um Documento: valor, quantidade, medida, data de expiração (fim da validade no encarte; pode estar no passado para histórico) e promoção opcional; refere-se a um Produto em um Mercado, com Marca opcional.
-_Avoid_: Deal, item, listing, produto
+Observação de preço extraída de um Documento: valor, quantidade, medida, data de expiração (fim da validade no encarte; pode estar no passado para histórico) e promoção opcional; refere-se a um Produto em um Mercado, com Marca opcional. O histórico de preços de um Produto é o conjunto de Ofertas ao longo do tempo (via Documentos); o “período atual” é filtro do consumidor da base, não um estado embutido no Produto.
+_Avoid_: Deal, item, listing, produto, histórico de produto (como entidade separada)
 
 **Produto**:
 Identidade de catálogo do que está à venda, sem marca (ex.: “Arroz integral”, “Arroz branco parboilizado”); carrega categorias taxonômicas para navegação e agregação. Distinta por tipo vendável; N Marcas aparecem via Ofertas, não como lista fixa no Produto.
@@ -21,7 +21,7 @@ Rótulo taxonômico de um Produto para filtrar e agrupar (ex.: mercearia, grãos
 _Avoid_: tipo, variante, tag solta na Oferta
 
 **Fonte**:
-URL configurada e persistida cuja resposta revela URLs de PDFs (HTML/JS/JSON); o nome do arquivo identifica o Documento e o download usa a URL do link. Pode apontar para página HTML ou endpoint JSON de ofertas. Pertence a um Mercado; pode incluir filtro opcional por regex sobre o nome do Documento e, opt-in, permissão para obter `dataExpiracao` a partir do nome do arquivo quando o Extrator omite a data.
+URL configurada e persistida cuja resposta revela URLs de PDFs (HTML/JS/JSON); o nome do arquivo identifica o Documento e o download usa a URL do link. Pode apontar para página HTML ou endpoint JSON de ofertas. Pertence a um Mercado; pode incluir filtro opcional por regex sobre o nome do Documento. Pode obter `dataExpiracao` a partir do nome do arquivo quando o Extrator omite a data (`fallbackDataExpiracaoFilename` na Fonte, não no Mercado): a flag começa desligada e liga-se automaticamente ao aparecer um candidato sem data; o fallback aplica-se já na mesma tentativa. Se o Extrator envia a data, ela prevalece.
 _Avoid_: Site, link, URL, origem
 
 **Mercado**:
@@ -29,11 +29,11 @@ Identidade comercial (rede ou bandeira) à qual uma Fonte pertence; sujeito da c
 _Avoid_: loja, supermercado, site, Fonte
 
 **Documento**:
-PDF identificado em uma Fonte pelo nome do arquivo e pelo dia da descoberta; rastreado ao longo do processamento (descoberta, rasterização, extração). Estados: descoberto, processando, concluído, parcial, falhou. Sem pelo menos uma Oferta persistida (lista vazia do Extrator ou só Falhas de Extração), o Documento termina em falhou. Em falha dura de processamento (incluindo Extrator indisponível após retentativas), permanece consultável com o motivo do último erro.
-_Avoid_: PDF, arquivo, anexo
+PDF identificado em uma Fonte pelo nome do arquivo e pelo dia da descoberta; rastreado ao longo do processamento (download, rasterização, extração). Estados persistidos: processando, concluído, parcial, falhou. Entra em processando no início do tratamento (não há estado persistido “listado mas ainda não baixado”). Sem pelo menos uma Oferta persistida (lista vazia do Extrator ou só Falhas de Extração), o Documento termina em falhou. Em falha dura de processamento (incluindo Extrator indisponível após retentativas), permanece consultável com o motivo do último erro.
+_Avoid_: PDF, arquivo, anexo, descoberto (como estado persistido)
 
 **Extrator**:
-Capacidade de obter candidatos a Oferta a partir das imagens de um Documento (rótulos de produto, marca e categorias, mais preço e promoção).
+Capacidade de obter candidatos a Oferta a partir das imagens de um Documento (rótulos de produto, marca e categorias, mais preço, data de expiração e promoção). Espera-se `dataExpiracao` em todo candidato; ausência é tratada via fallback de filename na Fonte.
 _Avoid_: Gemini, IA, conversor, parser, LLM
 
 **Medida**:
@@ -49,7 +49,7 @@ Registro de uma tentativa de Oferta que não passou na validação, vinculada ao
 _Avoid_: export com erro, erro de IA, rejeição
 
 **Artefato**:
-Material obtido ou gerado em uma tentativa de processamento de um Documento e retido para debug: PDF original, imagens enviadas ao Extrator, resposta bruta do Extrator e resultado validado (Ofertas e Falhas de Extração). Cada reprocessamento acrescenta uma nova tentativa; tentativas anteriores permanecem. Ofertas e Falhas de Extração persistidas no estado atual do Documento são substituídas na nova tentativa — o histórico de tentativas vive nos Artefatos. Hoje em armazenamento local; depois em bucket.
+Material obtido ou gerado em uma tentativa de processamento de um Documento e retido para debug — tipicamente PDF original, imagens enviadas ao Extrator, resposta bruta do Extrator e resultado validado (Ofertas e Falhas de Extração). Em falha dura, persiste-se só o que a tentativa chegou a produzir (best-effort); não se fabricam placeholders para etapas que não rodaram. Cada reprocessamento acrescenta uma nova tentativa; tentativas anteriores permanecem. Ofertas e Falhas de Extração persistidas no estado atual do Documento são substituídas na nova tentativa — o histórico de tentativas vive nos Artefatos. Hoje em armazenamento local; depois em bucket.
 _Avoid_: arquivo, blob, export, attachment, log
 
 ## Qualidade local

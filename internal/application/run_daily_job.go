@@ -37,6 +37,10 @@ type RunDailyJobDeps struct {
 	Location   *time.Location // America/Sao_Paulo
 	// ExtratorRetryBudget is the max wall-clock spent retrying Extrator outages (ADR 0022).
 	ExtratorRetryBudget time.Duration
+	// OnlyFonteID, when non-empty, processes only that Fonte (smoke tests).
+	OnlyFonteID domain.FonteID
+	// MaxDocumentos stops after N documentos are attempted (0 = no limit). Smoke tests use 1.
+	MaxDocumentos int
 }
 
 // RunDailyJob processes Fontes sequentially for the current discovery day.
@@ -68,10 +72,18 @@ func RunDailyJob(ctx context.Context, d RunDailyJobDeps) error {
 
 	extratorBudgetLeft := d.ExtratorRetryBudget
 	extratorKnownDown := false
+	processed := 0
 
 	for _, fonte := range fontes {
 		if err := ctx.Err(); err != nil {
 			return err
+		}
+		if d.OnlyFonteID != "" && fonte.ID != d.OnlyFonteID {
+			d.Log.Printf("fonte %s skipped (RUN_FONTE_ID=%s)", fonte.ID, d.OnlyFonteID)
+			continue
+		}
+		if d.MaxDocumentos > 0 && processed >= d.MaxDocumentos {
+			break
 		}
 		all, err := d.FonteHTTP.DiscoverPDFs(ctx, fonte)
 		if err != nil {
@@ -95,12 +107,17 @@ func RunDailyJob(ctx context.Context, d RunDailyJobDeps) error {
 		}
 
 		for _, pdf := range kept {
+			if d.MaxDocumentos > 0 && processed >= d.MaxDocumentos {
+				d.Log.Printf("RUN_MAX_DOCUMENTOS=%d reached; stopping", d.MaxDocumentos)
+				return nil
+			}
 			if err := processDocumento(ctx, d, fonte, pdf, dia, &extratorBudgetLeft, &extratorKnownDown); err != nil {
 				if errors.Is(err, errGlobalInfra) {
 					return err
 				}
 				d.Log.Printf("documento %s/%s: %v", fonte.ID, pdf.Filename, err)
 			}
+			processed++
 		}
 	}
 	return nil

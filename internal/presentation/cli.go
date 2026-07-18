@@ -22,27 +22,43 @@ import (
 
 // Env holds process configuration.
 type Env struct {
-	UpstashURL   string
-	UpstashToken string
-	ArtefatoRoot string
-	RasterMaxPx  int
-	RasterJPEGQ  int
-	SeedPath     string
-	UseStubExtrator bool
+	UpstashURL         string
+	UpstashToken       string
+	ArtefatoRoot       string
+	RasterMaxPx        int
+	RasterJPEGQ        int
+	SeedPath           string
+	UseStubExtrator    bool
+	GeminiAPIKey       string
+	GeminiModel        string
+	ExtratorPromptPath string
+	ExtracaoSchemaPath string
+	OfertaSchemaPath   string
+	RunFonteID         string
+	RunMaxDocumentos   int
 }
 
 func LoadEnv() Env {
 	maxPx, _ := strconv.Atoi(os.Getenv("RASTER_MAX_EDGE_PX"))
 	jpegQ, _ := strconv.Atoi(os.Getenv("RASTER_JPEG_QUALITY"))
-	stub := os.Getenv("EXTRATOR_STUB") == "1" || os.Getenv("GEMINI_API_KEY") == ""
+	maxDocs, _ := strconv.Atoi(os.Getenv("RUN_MAX_DOCUMENTOS"))
+	apiKey := os.Getenv("GEMINI_API_KEY")
+	stub := os.Getenv("EXTRATOR_STUB") == "1" || apiKey == ""
 	return Env{
-		UpstashURL:      os.Getenv("UPSTASH_REDIS_REST_URL"),
-		UpstashToken:    os.Getenv("UPSTASH_REDIS_REST_TOKEN"),
-		ArtefatoRoot:    envOr("ARTEFATO_ROOT", "./.data/artefatos"),
-		RasterMaxPx:     maxPx,
-		RasterJPEGQ:     jpegQ,
-		SeedPath:        envOr("SEED_PATH", "./seed/fontes.json"),
-		UseStubExtrator: stub,
+		UpstashURL:         os.Getenv("UPSTASH_REDIS_REST_URL"),
+		UpstashToken:       os.Getenv("UPSTASH_REDIS_REST_TOKEN"),
+		ArtefatoRoot:       envOr("ARTEFATO_ROOT", "./.data/artefatos"),
+		RasterMaxPx:        maxPx,
+		RasterJPEGQ:        jpegQ,
+		SeedPath:           envOr("SEED_PATH", "./seed/fontes.json"),
+		UseStubExtrator:    stub,
+		GeminiAPIKey:       apiKey,
+		GeminiModel:        os.Getenv("GEMINI_MODEL"),
+		ExtratorPromptPath: envOr("EXTRATOR_PROMPT_PATH", "./prompts/extrator.txt"),
+		ExtracaoSchemaPath: envOr("EXTRACAO_SCHEMA_PATH", "./schemas/extracao.json"),
+		OfertaSchemaPath:   envOr("OFERTA_SCHEMA_PATH", "./schemas/oferta.json"),
+		RunFonteID:         os.Getenv("RUN_FONTE_ID"),
+		RunMaxDocumentos:   maxDocs,
 	}
 }
 
@@ -104,11 +120,34 @@ func RunDaily(ctx context.Context, env Env) error {
 
 	var ext domain.Extrator
 	if env.UseStubExtrator {
-		log.Printf("using Extrator stub (Gemini adapter not wired yet)")
+		log.Printf("using Extrator stub (EXTRATOR_STUB=1 or GEMINI_API_KEY empty)")
+		ext = extrator.Stub{Candidatos: nil}
 	} else {
-		log.Printf("GEMINI_API_KEY set but Gemini Extrator not implemented yet; using stub")
+		g, err := extrator.NewGemini(ctx, extrator.GeminiConfig{
+			APIKey:             env.GeminiAPIKey,
+			Model:              env.GeminiModel,
+			PromptPath:         env.ExtratorPromptPath,
+			ExtracaoSchemaPath: env.ExtracaoSchemaPath,
+			OfertaSchemaPath:   env.OfertaSchemaPath,
+			Logger:             log.Default(),
+		})
+		if err != nil {
+			return fmt.Errorf("gemini extrator: %w", err)
+		}
+		model := env.GeminiModel
+		if model == "" {
+			model = "gemini-3-flash-preview"
+		}
+		log.Printf("using Gemini Extrator model=%s", model)
+		ext = g
 	}
-	ext = extrator.Stub{Candidatos: nil}
+
+	if env.RunFonteID != "" {
+		log.Printf("smoke: RUN_FONTE_ID=%s", env.RunFonteID)
+	}
+	if env.RunMaxDocumentos > 0 {
+		log.Printf("smoke: RUN_MAX_DOCUMENTOS=%d", env.RunMaxDocumentos)
+	}
 
 	deps := application.RunDailyJobDeps{
 		Fontes:     upstash.NewFonteRepo(client),
@@ -124,6 +163,8 @@ func RunDaily(ctx context.Context, env Env) error {
 		Dates:      filenamedate.Parser{},
 		Log:        log.Default(),
 		ExtratorRetryBudget: time.Hour,
+		OnlyFonteID:         domain.FonteID(env.RunFonteID),
+		MaxDocumentos:       env.RunMaxDocumentos,
 	}
 	return application.RunDailyJob(ctx, deps)
 }

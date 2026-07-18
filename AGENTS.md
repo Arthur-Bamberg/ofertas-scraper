@@ -61,27 +61,26 @@ Required ports (names may vary; responsibilities must not):
 - **ProdutoRepository** — list/save Produtos (catalog identity + categorias)
 - **MarcaRepository** — list/save Marcas
 - **DocumentoRepository** — track Documento lifecycle
-- **OfertaRepository** — persist Ofertas linked to Documento (and Produto + Marca + Mercado)
+- **OfertaRepository** — persist Ofertas linked to Documento (and Produto + Marca + Mercado); maintain SET index `ofertas:produto:{produtoId}` → documentoIds (ADR 0026)
 - **FalhaExtracaoRepository** — persist Falhas de Extração linked to Documento
 - **Extrator** — images in → candidate Ofertas (raw) out
 - **ArtefatoStore** — save/load Artefatos (local now; bucket later behind same interface)
 - **FonteClient** — HTTP GET + PDF name discovery
 - **Rasterizer** — PDF bytes → downscaled page images
-- **FilenameDateParser** — optional parse of `dataExpiracao` from Documento filename (when Fonte enables fallback)
+- **FilenameDateParser** — parse of `dataExpiracao` from Documento filename (when Fonte has fallback enabled or auto-enabled — ADR 0025)
 
 ## Documento lifecycle
 
-States: `descoberto` → `processando` → `concluido` | `parcial` | `falhou`
+Persisted states: `processando` → `concluido` | `parcial` | `falhou` (`descoberto` is not a persisted state)
 
 | State | Meaning |
 |-------|---------|
-| `descoberto` | Listed from Fonte, not downloaded yet |
-| `processando` | Download / raster / Extrator in progress |
+| `processando` | Download / raster / Extrator in progress (entered at start of treatment) |
 | `concluido` | ≥1 Oferta saved, zero Falhas de Extração |
 | `parcial` | ≥1 Oferta saved and ≥1 Falha de Extração |
 | `falhou` | Hard failure **or** zero Ofertas persistidas (Extrator com `ofertas` vazio, ou só Falhas de Extração) |
 
-Same-day re-run: skip `concluido` and `parcial`; retry `falhou`, `descoberto`, and orphan `processando`.
+Same-day re-run: skip `concluido` and `parcial`; retry `falhou` and orphan `processando`.
 
 ## Extrator (Gemini adapter)
 
@@ -97,21 +96,21 @@ Same-day re-run: skip `concluido` and `parcial`; retry `falhou`, `descoberto`, a
 - Extrator candidates include `produto`, optional `marca`, `categorias[]`, plus `valor` / `quantidade` / `medida` / `dataExpiracao` / optional `promocao` (see ADR 0010); persisted Oferta stores `produtoId`, `mercadoId`, and optional `marcaId` after match-or-create (ADR 0015)
 - `medida` is only `g` | `ml` | `unidade`
 - Extrator must normalize **kg → 1000 g** and **L → 1000 ml** (adjust `quantidade`) before output; domain does **not** convert — any other `medida` is a Falha de Extração (see ADR 0004; hybrid domain safety-net deferred)
-- `dataExpiracao` = end of validity on the flyer (not discovery day); prefer Extrator value; if missing and Fonte has filename-fallback enabled, parse from Documento filename; Extrator always wins when present (ADR 0013); past dates are valid (price history — ADR 0016)
+- `dataExpiracao` = end of validity on the flyer (not discovery day); Extrator contract requires it; if missing/empty, auto-enable `fallbackDataExpiracaoFilename` on the Fonte and parse from Documento filename in the same attempt; Extrator always wins when present (ADR 0025, supersedes 0013); past dates are valid (price history — ADR 0016)
 - `promocao` is optional and one of three shapes (leve/pague, quantidade+valor, cartão)
-- Fonte field `fallbackDataExpiracaoFilename` defaults to `false` (opt-in per Fonte)
+- Fonte field `fallbackDataExpiracaoFilename` defaults to `false`; auto-enabled when a candidate arrives without `dataExpiracao` (ADR 0025)
 - Domain match-or-create for Produto/Marca uses normalized exact label match only (ADR 0011); no fuzzy matching in the MVP
 
 ## Artefatos
 
-For every processed Documento, always persist:
+For each processing attempt, persist **best-effort** what the pipeline produced (ADR 0027):
 
-1. Original PDF
-2. Images sent to Extrator
-3. Raw Extrator response
-4. Validated result (Ofertas + Falhas de Extração)
+1. Original PDF (if download succeeded)
+2. Images sent to Extrator (if raster succeeded)
+3. Raw Extrator response (if Extract returned)
+4. Validated result (Ofertas + Falhas de Extração) when validation ran
 
-Store via `ArtefatoStore` only — never write files ad hoc from use cases.
+Do not write empty placeholders for steps that never ran. Store via `ArtefatoStore` only — never write files ad hoc from use cases.
 
 ## Local environment
 
@@ -136,13 +135,19 @@ After that, every `git commit` runs `go test ./...` and aborts on failure. Do no
 UPSTASH_REDIS_REST_URL=
 UPSTASH_REDIS_REST_TOKEN=
 GEMINI_API_KEY=
+GEMINI_MODEL=gemini-3-flash-preview
 EXTRATOR_STUB=1
+EXTRATOR_PROMPT_PATH=./prompts/extrator.txt
+EXTRACAO_SCHEMA_PATH=./schemas/extracao.json
+OFERTA_SCHEMA_PATH=./schemas/oferta.json
 SEED_PATH=./seed/fontes.json
 ARTEFATO_ROOT=./.data/artefatos
 RASTER_MAX_EDGE_PX=1280
 RASTER_JPEG_QUALITY=80
 TZ=America/Sao_Paulo
 ```
+
+Production Extrator: set `GEMINI_API_KEY` and `EXTRATOR_STUB=0` (or unset stub). Local/dev may keep the stub (ADR 0023).
 
 CLI: `ofertas-scraper seed` (upsert Mercados/Fontes from `SEED_PATH`) then `ofertas-scraper run`. Rasterizer needs `pdftoppm` (poppler-utils) on PATH.
 
