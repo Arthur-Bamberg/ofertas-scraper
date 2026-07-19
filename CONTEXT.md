@@ -5,8 +5,8 @@ Sistema que coleta PDFs de Fontes de ofertas, rasteriza páginas em imagens, ext
 ## Language
 
 **Oferta**:
-Observação de preço extraída de um Documento: valor, quantidade, medida, `dataInicio` e `dataExpiracao` (vigência no encarte; `dataInicio` ≤ `dataExpiracao`; a expiração pode estar no passado para histórico; ambas podem ser futuras) e promoção opcional; refere-se a um Produto em um Mercado, com Marca opcional. Cada data carrega origem (`origemDataInicio` / `origemDataExpiracao`) com valor `extrator`, `filename` ou — só no início — `primeiraDescoberta`. Cascata de `dataInicio`: Extrator → início distinto no nome (incl. intervalo no filename; token ISO único não conta como início) → dia da primeira descoberta na Fonte (menor dia de qualquer Documento com aquele nome na Fonte, independente do estado). Cascata de `dataExpiracao`: Extrator → fim no nome (intervalo ou token ISO; sempre tentada; sem flag na Fonte); se ambas falharem, Falha de Extração — sem inventar fim. As duas cascatas são independentes. Toda Oferta tem `dataInicio`, `dataExpiracao` e as duas origens — não há forma legítima sem esses campos. O histórico de preços de um Produto é o conjunto de Ofertas ao longo do tempo (via Documentos); o “período atual” é filtro do consumidor da base, não um estado embutido no Produto.
-_Avoid_: Deal, item, listing, produto, histórico de produto (como entidade separada), dataComeço, vigenciaInicio
+Observação de preço extraída de um Documento: valor, `quantidades[]` (≥1, mesma Medida), `dataInicio` e `dataExpiracao` (vigência no encarte; `dataInicio` ≤ `dataExpiracao`; a expiração pode estar no passado para histórico; ambas podem ser futuras) e promoção opcional; refere-se a um Produto em um Mercado, com Marca opcional. Vários tamanhos no mesmo preço do encarte (lista discreta explícita, ex. 90g / 150g / 200g) são uma só Oferta; preços ou blocos distintos geram Ofertas distintas; intervalo vago ou “diversos tamanhos” sem números não vira Oferta. Domain normaliza `quantidades` (dedup + ordem crescente). Promoção, quando houver, aplica ao bloco inteiro. Preço unitário por tamanho é expansão do consumidor da base, não linhas extras persistidas. Cada data carrega origem (`origemDataInicio` / `origemDataExpiracao`) com valor `extrator`, `filename` ou — só no início — `primeiraDescoberta`. Cascata de `dataInicio`: Extrator → início distinto no nome (incl. intervalo no filename; token ISO único não conta como início) → dia da primeira descoberta na Fonte (menor dia de qualquer Documento com aquele nome na Fonte, independente do estado). Cascata de `dataExpiracao`: Extrator → fim no nome (intervalo ou token ISO; sempre tentada; sem flag na Fonte); se ambas falharem, Falha de Extração — sem inventar fim. As duas cascatas são independentes. Toda Oferta tem `dataInicio`, `dataExpiracao` e as duas origens — não há forma legítima sem esses campos. O histórico de preços de um Produto é o conjunto de Ofertas ao longo do tempo (via Documentos); o “período atual” é filtro do consumidor da base, não um estado embutido no Produto.
+_Avoid_: Deal, item, listing, produto, histórico de produto (como entidade separada), dataComeço, vigenciaInicio, quantidade (singular como campo do contrato)
 
 **Produto**:
 Identidade de catálogo do que está à venda, sem marca (ex.: “Arroz integral”, “Arroz branco parboilizado”); carrega categorias taxonômicas para navegação e agregação. Distinta por tipo vendável; N Marcas aparecem via Ofertas, não como lista fixa no Produto.
@@ -37,7 +37,7 @@ Capacidade de obter candidatos a Oferta a partir das imagens de um Documento (r�
 _Avoid_: Gemini, IA, conversor, parser, LLM
 
 **Medida**:
-Unidade de quantidade de uma Oferta, sempre normalizada para `g`, `ml` ou `unidade` (kg → 1000 g; L → 1000 ml).
+Unidade compartilhada por todas as `quantidades` de uma Oferta, sempre normalizada para `g`, `ml` ou `unidade` (kg → 1000 g; L → 1000 ml).
 _Avoid_: unidade de medida, kg, litro, L
 
 **Promoção**:

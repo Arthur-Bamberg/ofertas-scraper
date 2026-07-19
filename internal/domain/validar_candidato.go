@@ -1,6 +1,8 @@
 package domain
 
 import (
+	"encoding/json"
+	"sort"
 	"strings"
 	"time"
 )
@@ -14,14 +16,14 @@ const (
 )
 
 const (
-	CodigoMedidaInvalida         = "medida_invalida"
-	CodigoProdutoInvalido        = "produto_invalido"
-	CodigoValorInvalido          = "valor_invalido"
-	CodigoQuantidadeInvalida     = "quantidade_invalida"
-	CodigoDataInicioInvalida     = "data_inicio_invalida"
-	CodigoDataExpiracaoInvalida  = "data_expiracao_invalida"
-	CodigoVigenciaInvalida       = "vigencia_invalida"
-	CodigoPromocaoInvalida       = "promocao_invalida"
+	CodigoMedidaInvalida        = "medida_invalida"
+	CodigoProdutoInvalido       = "produto_invalido"
+	CodigoValorInvalido         = "valor_invalido"
+	CodigoQuantidadeInvalida    = "quantidade_invalida"
+	CodigoDataInicioInvalida    = "data_inicio_invalida"
+	CodigoDataExpiracaoInvalida = "data_expiracao_invalida"
+	CodigoVigenciaInvalida      = "vigencia_invalida"
+	CodigoPromocaoInvalida      = "promocao_invalida"
 )
 
 // CandidatoOferta is the Extrator candidate before match-or-create.
@@ -30,11 +32,40 @@ type CandidatoOferta struct {
 	Marca         string    `json:"marca,omitempty"`
 	Categorias    []string  `json:"categorias,omitempty"`
 	Valor         float64   `json:"valor"`
-	Quantidade    float64   `json:"quantidade"`
+	Quantidades   []float64 `json:"quantidades"`
 	Medida        string    `json:"medida"`
 	DataInicio    string    `json:"dataInicio"`
 	DataExpiracao string    `json:"dataExpiracao"`
 	Promocao      *Promocao `json:"promocao,omitempty"`
+}
+
+// UnmarshalJSON accepts quantidades[] and legacy singular quantidade (ADR 0030).
+func (c *CandidatoOferta) UnmarshalJSON(data []byte) error {
+	var j struct {
+		Produto       string    `json:"produto"`
+		Marca         string    `json:"marca,omitempty"`
+		Categorias    []string  `json:"categorias,omitempty"`
+		Valor         float64   `json:"valor"`
+		Quantidades   []float64 `json:"quantidades"`
+		Quantidade    *float64  `json:"quantidade"`
+		Medida        string    `json:"medida"`
+		DataInicio    string    `json:"dataInicio"`
+		DataExpiracao string    `json:"dataExpiracao"`
+		Promocao      *Promocao `json:"promocao,omitempty"`
+	}
+	if err := json.Unmarshal(data, &j); err != nil {
+		return err
+	}
+	c.Produto = j.Produto
+	c.Marca = j.Marca
+	c.Categorias = j.Categorias
+	c.Valor = j.Valor
+	c.Quantidades = coalesceQuantidades(j.Quantidades, j.Quantidade)
+	c.Medida = j.Medida
+	c.DataInicio = j.DataInicio
+	c.DataExpiracao = j.DataExpiracao
+	c.Promocao = j.Promocao
+	return nil
 }
 
 // OfertaValidada is a candidate that passed domain validation (labels, not ids).
@@ -43,7 +74,7 @@ type OfertaValidada struct {
 	Marca               string
 	Categorias          []string
 	Valor               float64
-	Quantidade          float64
+	Quantidades         []float64
 	Medida              Medida
 	DataInicio          string
 	DataExpiracao       string
@@ -77,8 +108,9 @@ func ValidarCandidato(c CandidatoOferta) (OfertaValidada, *FalhaExtracao) {
 		return falha(c, CodigoValorInvalido, "valor deve ser > 0")
 	}
 
-	if c.Quantidade < 0 {
-		return falha(c, CodigoQuantidadeInvalida, "quantidade deve ser >= 0")
+	quantidades, ok := normalizarQuantidades(c.Quantidades)
+	if !ok {
+		return falha(c, CodigoQuantidadeInvalida, "quantidades deve ter ≥1 valor >= 0")
 	}
 
 	medida, ok := parseMedida(c.Medida)
@@ -107,7 +139,7 @@ func ValidarCandidato(c CandidatoOferta) (OfertaValidada, *FalhaExtracao) {
 		Marca:         strings.TrimSpace(c.Marca),
 		Categorias:    normalizarCategorias(c.Categorias),
 		Valor:         c.Valor,
-		Quantidade:    c.Quantidade,
+		Quantidades:   quantidades,
 		Medida:        medida,
 		DataInicio:    c.DataInicio,
 		DataExpiracao: c.DataExpiracao,
@@ -130,6 +162,40 @@ func parseMedida(s string) (Medida, bool) {
 	default:
 		return "", false
 	}
+}
+
+func coalesceQuantidades(quantidades []float64, legacy *float64) []float64 {
+	if len(quantidades) > 0 {
+		return quantidades
+	}
+	if legacy != nil {
+		return []float64{*legacy}
+	}
+	return nil
+}
+
+// normalizarQuantidades dedups and sorts ascending (ADR 0030). Rejects empty or negative.
+func normalizarQuantidades(in []float64) ([]float64, bool) {
+	if len(in) == 0 {
+		return nil, false
+	}
+	for _, q := range in {
+		if q < 0 {
+			return nil, false
+		}
+	}
+	sorted := append([]float64(nil), in...)
+	sort.Float64s(sorted)
+	out := make([]float64, 0, len(sorted))
+	var prev float64
+	for i, q := range sorted {
+		if i > 0 && q == prev {
+			continue
+		}
+		out = append(out, q)
+		prev = q
+	}
+	return out, true
 }
 
 func validarPromocao(c CandidatoOferta) *FalhaExtracao {

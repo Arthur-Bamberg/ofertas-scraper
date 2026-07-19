@@ -21,7 +21,7 @@ func TestPersistirOfertasValidas_MatchOrCreateAndCategoriasUnion(t *testing.T) {
 	ofertas, err := application.PersistirOfertasValidas(context.Background(), produtos, marcas, doc, []domain.OfertaValidada{
 		{
 			Produto: "Arroz Integral", Marca: "Camil", Categorias: []string{"grãos"},
-			Valor: 10, Quantidade: 1000, Medida: domain.MedidaG,
+			Valor: 10, Quantidades: []float64{1000}, Medida: domain.MedidaG,
 			DataInicio: "2026-07-18", DataExpiracao: "2026-07-25",
 			OrigemDataInicio: domain.OrigemExtrator, OrigemDataExpiracao: domain.OrigemExtrator,
 		},

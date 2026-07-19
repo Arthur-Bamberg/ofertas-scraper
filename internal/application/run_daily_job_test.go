@@ -185,7 +185,7 @@ func TestRunDailyJob_PersistsValidOferta(t *testing.T) {
 		},
 		Raster: raster.Fixed{Pages: []domain.PageImage{{Page: 1, JPEG: []byte{0xff, 0xd8}}}},
 		Extrator: extrator.Stub{Candidatos: []domain.CandidatoOferta{{
-			Produto: "Arroz", Valor: 10, Quantidade: 1000, Medida: "g",
+			Produto: "Arroz", Valor: 10, Quantidades: []float64{1000}, Medida: "g",
 			DataInicio: "2026-07-18", DataExpiracao: "2026-07-25",
 		}}},
 		Artefatos: memArtefatos{},
@@ -311,7 +311,7 @@ func TestRunDailyJob_OnlyFonteID(t *testing.T) {
 		Raster: raster.Fixed{Pages: []domain.PageImage{{Page: 1, JPEG: []byte{0xff, 0xd8}}}},
 		Extrator: &countingExtrator{
 			inner: extrator.Stub{Candidatos: []domain.CandidatoOferta{{
-				Produto: "Feijão", Valor: 5, Quantidade: 1, Medida: "unidade",
+				Produto: "Feijão", Valor: 5, Quantidades: []float64{1}, Medida: "unidade",
 				DataInicio: "2026-07-18", DataExpiracao: "2026-07-25",
 			}}},
 			n: &calls,
@@ -364,7 +364,7 @@ func TestRunDailyJob_MaxDocumentos(t *testing.T) {
 		Raster: raster.Fixed{Pages: []domain.PageImage{{Page: 1, JPEG: []byte{0xff, 0xd8}}}},
 		Extrator: &countingExtrator{
 			inner: extrator.Stub{Candidatos: []domain.CandidatoOferta{{
-				Produto: "Leite", Valor: 4, Quantidade: 1000, Medida: "ml",
+				Produto: "Leite", Valor: 4, Quantidades: []float64{1000}, Medida: "ml",
 				DataInicio: "2026-07-18", DataExpiracao: "2026-07-25",
 			}}},
 			n: &calls,
@@ -415,7 +415,7 @@ func TestRunDailyJob_SkipsParcial(t *testing.T) {
 		Raster: raster.Fixed{Pages: []domain.PageImage{{Page: 1, JPEG: []byte{1}}}},
 		Extrator: &countingExtrator{
 			inner: extrator.Stub{Candidatos: []domain.CandidatoOferta{{
-				Produto: "X", Valor: 1, Quantidade: 1, Medida: "unidade",
+				Produto: "X", Valor: 1, Quantidades: []float64{1}, Medida: "unidade",
 				DataInicio: "2026-07-18", DataExpiracao: "2026-07-25",
 			}}},
 			n: &calls,

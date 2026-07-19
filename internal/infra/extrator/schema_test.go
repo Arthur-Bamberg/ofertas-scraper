@@ -54,14 +54,25 @@ func TestLoadGeminiResponseSchema(t *testing.T) {
 		t.Fatalf("expected enum for promocaoClube: %#v", clubeField)
 	}
 	required, _ := oferta["required"].([]any)
-	hasInicio := false
+	hasInicio, hasQuantidades := false, false
 	for _, r := range required {
 		if r == "dataInicio" {
 			hasInicio = true
 		}
+		if r == "quantidades" {
+			hasQuantidades = true
+		}
 	}
 	if !hasInicio {
 		t.Fatalf("dataInicio must be required: %#v", required)
+	}
+	if !hasQuantidades {
+		t.Fatalf("quantidades must be required: %#v", required)
+	}
+	ofertaProps, _ := oferta["properties"].(map[string]any)
+	qtd, _ := ofertaProps["quantidades"].(map[string]any)
+	if qtd["type"] != "array" {
+		t.Fatalf("quantidades type: %#v", qtd["type"])
 	}
 }
 

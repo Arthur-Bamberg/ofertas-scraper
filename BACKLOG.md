@@ -15,6 +15,7 @@ Itens futuros — fora do escopo do MVP atual. Não são compromissos de sprint;
 
 ## Extração e catálogo
 
+- [ ] **Validar PDFs só com preço de clube:** em alguns encartes a Oferta aparece apenas no clube (sem valor de prateleira / “base” fora do clube). Hoje `promocao` é um único formato e `valor` é obrigatório — pode ser preciso permitir mais de uma Promoção na mesma Oferta e/ou Oferta sem valor base. Revisar Artefatos reais antes de mudar o contrato (ADR 0029).
 - [ ] **Job de merge de catálogo** (Produto/Marca): fora do job diário; propõe ou aplica fusões de duplicatas por grafia/sentido diferente, usando Gemini como juiz assistido — o match-or-create do pipeline permanece exact normalizado (ADR 0011). Substituí a ideia de fuzzy inline no hot path.
 - [ ] Safety-net de Medida no domain (kg/L → g/ml) se o Extrator falhar nisso com frequência (ADR 0004).
 - [ ] Estratégia de Fonte além de HTML/JSON genérico, se aparecer Fonte real que não caiba no adaptador atual (ADR 0020).

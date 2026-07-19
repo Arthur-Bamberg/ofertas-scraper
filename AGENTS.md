@@ -93,9 +93,10 @@ Same-day re-run: skip `concluido` and `parcial`; retry `falhou` and orphan `proc
 
 ### Oferta rules agents must respect
 
-- Extrator candidates include `produto`, optional `marca`, `categorias[]`, plus `valor` / `quantidade` / `medida` / `dataInicio` / `dataExpiracao` / optional `promocao` (see ADR 0010); persisted Oferta stores `produtoId`, `mercadoId`, optional `marcaId`, vigência + `origemDataInicio` / `origemDataExpiracao` after match-or-create (ADR 0015, 0028)
+- Extrator candidates include `produto`, optional `marca`, `categorias[]`, plus `valor` / `quantidades[]` / `medida` / `dataInicio` / `dataExpiracao` / optional `promocao` (see ADR 0010, 0030); persisted Oferta stores `produtoId`, `mercadoId`, optional `marcaId`, vigência + `origemDataInicio` / `origemDataExpiracao` after match-or-create (ADR 0015, 0028)
+- `quantidades` is a non-empty array of sizes sharing one price and one `medida`; domain dedups and sorts ascending; same-price discrete lists on the flyer → one Oferta; readers accept legacy singular `quantidade` as `[n]` (ADR 0030)
 - `medida` is only `g` | `ml` | `unidade`
-- Extrator must normalize **kg → 1000 g** and **L → 1000 ml** (adjust `quantidade`) before output; domain does **not** convert — any other `medida` is a Falha de Extração (see ADR 0004; hybrid domain safety-net deferred)
+- Extrator must normalize **kg → 1000 g** and **L → 1000 ml** (adjust each value in `quantidades`) before output; domain does **not** convert — any other `medida` is a Falha de Extração (see ADR 0004; hybrid domain safety-net deferred)
 - `dataInicio` / `dataExpiracao` = vigência no encarte; both required in Extrator contract; cascades always on (ADR 0028): Extrator wins when present; missing início → distinct start in filename → primeira descoberta na Fonte; missing fim → filename end, else Falha; past/future dates OK (ADR 0016); `dataInicio` ≤ `dataExpiracao`
 - `promocao` is optional and one of four shapes (leve/pague, quantidade+valor, cartão, clube — ADR 0029)
 - Domain match-or-create for Produto/Marca uses normalized exact label match only (ADR 0011); no fuzzy matching in the MVP

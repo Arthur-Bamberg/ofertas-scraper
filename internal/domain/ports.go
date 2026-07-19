@@ -65,7 +65,7 @@ type Oferta struct {
 	MarcaID             *MarcaID    `json:"marcaId,omitempty"`
 	MercadoID           MercadoID   `json:"mercadoId"`
 	Valor               float64     `json:"valor"`
-	Quantidade          float64     `json:"quantidade"`
+	Quantidades         []float64   `json:"quantidades"`
 	Medida              Medida      `json:"medida"`
 	DataInicio          string      `json:"dataInicio"`
 	DataExpiracao       string      `json:"dataExpiracao"`

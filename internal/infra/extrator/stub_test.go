@@ -11,7 +11,7 @@ import (
 
 func TestStub_ReturnsCandidatosAndRaw(t *testing.T) {
 	s := extrator.Stub{Candidatos: []domain.CandidatoOferta{{
-		Produto: "Arroz", Valor: 1, Quantidade: 1, Medida: "g",
+		Produto: "Arroz", Valor: 1, Quantidades: []float64{1}, Medida: "g",
 		DataInicio: "2026-07-18", DataExpiracao: "2026-07-20",
 	}}}
 	cands, raw, err := s.Extract(context.Background(), nil)

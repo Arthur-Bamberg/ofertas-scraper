@@ -43,7 +43,7 @@ func PersistirOfertasValidas(
 			MarcaID:             marcaID,
 			MercadoID:           doc.MercadoID,
 			Valor:               v.Valor,
-			Quantidade:          v.Quantidade,
+			Quantidades:         v.Quantidades,
 			Medida:              v.Medida,
 			DataInicio:          v.DataInicio,
 			DataExpiracao:       v.DataExpiracao,

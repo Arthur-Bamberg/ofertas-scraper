@@ -25,8 +25,8 @@ func TestValidarExtracao_listaVaziaEhFalhou(t *testing.T) {
 
 func TestValidarExtracao_mistoParcial(t *testing.T) {
 	candidatos := []domain.CandidatoOferta{
-		{Produto: "Arroz", Valor: 10, Quantidade: 1000, Medida: "g", DataInicio: "2026-07-18", DataExpiracao: "2026-07-20"},
-		{Produto: "Feijão", Valor: 8, Quantidade: 1, Medida: "kg", DataInicio: "2026-07-18", DataExpiracao: "2026-07-20"},
+		{Produto: "Arroz", Valor: 10, Quantidades: []float64{1000}, Medida: "g", DataInicio: "2026-07-18", DataExpiracao: "2026-07-20"},
+		{Produto: "Feijão", Valor: 8, Quantidades: []float64{1}, Medida: "kg", DataInicio: "2026-07-18", DataExpiracao: "2026-07-20"},
 	}
 	validas, falhas, estado := application.ValidarExtracao(candidatos)
 	if len(validas) != 1 || len(falhas) != 1 {
@@ -42,7 +42,7 @@ func TestResolverVigencia_cascata(t *testing.T) {
 		DataInicio: "2026-07-18", DataExpiracao: "2026-07-19",
 	}}
 
-	semDatas := domain.CandidatoOferta{Produto: "X", Valor: 1, Quantidade: 1, Medida: "unidade"}
+	semDatas := domain.CandidatoOferta{Produto: "X", Valor: 1, Quantidades: []float64{1}, Medida: "unidade"}
 	got := application.ResolverVigencia(semDatas, "MS_Fort_FDS_18-e-19_JUL_26.pdf", parser, "2026-07-10")
 	if got.Candidato.DataInicio != "2026-07-18" || got.OrigemDataInicio != domain.OrigemFilename {
 		t.Fatalf("inicio filename: %#v", got)
@@ -75,7 +75,7 @@ func TestResolverVigencia_cascata(t *testing.T) {
 func TestValidarExtracaoResolvida_preservaOrigens(t *testing.T) {
 	resolvidos := []application.CandidatoResolvido{{
 		Candidato: domain.CandidatoOferta{
-			Produto: "Arroz", Valor: 10, Quantidade: 1000, Medida: "g",
+			Produto: "Arroz", Valor: 10, Quantidades: []float64{1000}, Medida: "g",
 			DataInicio: "2026-07-18", DataExpiracao: "2026-07-19",
 		},
 		OrigemDataInicio:    domain.OrigemFilename,
@@ -93,7 +93,7 @@ func TestValidarExtracaoResolvida_preservaOrigens(t *testing.T) {
 func TestValidarExtracaoResolvida_fimAusenteEhFalha(t *testing.T) {
 	resolvidos := []application.CandidatoResolvido{{
 		Candidato: domain.CandidatoOferta{
-			Produto: "Arroz", Valor: 10, Quantidade: 1000, Medida: "g",
+			Produto: "Arroz", Valor: 10, Quantidades: []float64{1000}, Medida: "g",
 			DataInicio: "2026-07-18",
 		},
 		OrigemDataInicio: domain.OrigemPrimeiraDescoberta,

@@ -1,6 +1,8 @@
 package domain_test
 
 import (
+	"encoding/json"
+	"reflect"
 	"testing"
 
 	"ofertas-scraper/internal/domain"
@@ -10,7 +12,7 @@ func TestValidarCandidato_aceitaCandidatoValido(t *testing.T) {
 	c := domain.CandidatoOferta{
 		Produto:       "Arroz integral",
 		Valor:         12.9,
-		Quantidade:    1000,
+		Quantidades: []float64{1000},
 		Medida:        "g",
 		DataInicio: "2026-07-18", DataExpiracao: "2026-07-20",
 		Categorias:    []string{"mercearia", "arroz"},
@@ -32,7 +34,7 @@ func TestValidarCandidato_rejeitaMedidaNaoNormalizada(t *testing.T) {
 	c := domain.CandidatoOferta{
 		Produto:       "Arroz integral",
 		Valor:         12.9,
-		Quantidade:    1,
+		Quantidades: []float64{1},
 		Medida:        "kg",
 		DataInicio: "2026-07-18", DataExpiracao: "2026-07-20",
 	}
@@ -53,7 +55,7 @@ func TestValidarCandidato_rejeitaProdutoVazio(t *testing.T) {
 	c := domain.CandidatoOferta{
 		Produto:       "  ",
 		Valor:         1,
-		Quantidade:    1,
+		Quantidades: []float64{1},
 		Medida:        "unidade",
 		DataInicio: "2026-07-18", DataExpiracao: "2026-07-20",
 	}
@@ -71,7 +73,7 @@ func TestValidarCandidato_rejeitaValorNaoPositivo(t *testing.T) {
 	c := domain.CandidatoOferta{
 		Produto:       "Banana",
 		Valor:         0,
-		Quantidade:    1,
+		Quantidades: []float64{1},
 		Medida:        "unidade",
 		DataInicio: "2026-07-18", DataExpiracao: "2026-07-20",
 	}
@@ -86,7 +88,7 @@ func TestValidarCandidato_aceitaDataExpiracaoPassada(t *testing.T) {
 	c := domain.CandidatoOferta{
 		Produto:       "Banana",
 		Valor:         2.5,
-		Quantidade:    1,
+		Quantidades: []float64{1},
 		Medida:        "unidade",
 		DataInicio: "2020-01-01", DataExpiracao: "2020-01-01",
 	}
@@ -104,7 +106,7 @@ func TestValidarCandidato_rejeitaDataExpiracaoInvalida(t *testing.T) {
 	c := domain.CandidatoOferta{
 		Produto:       "Banana",
 		Valor:         2.5,
-		Quantidade:    1,
+		Quantidades: []float64{1},
 		Medida:        "unidade",
 		DataInicio: "2020-01-01", DataExpiracao: "20/01/2020",
 	}
@@ -119,7 +121,7 @@ func TestValidarCandidato_rejeitaInicioAposExpiracao(t *testing.T) {
 	c := domain.CandidatoOferta{
 		Produto:       "Banana",
 		Valor:         2.5,
-		Quantidade:    1,
+		Quantidades: []float64{1},
 		Medida:        "unidade",
 		DataInicio:    "2026-07-25",
 		DataExpiracao: "2026-07-20",
@@ -135,7 +137,7 @@ func TestValidarCandidato_aceitaVigenciaUmDia(t *testing.T) {
 	c := domain.CandidatoOferta{
 		Produto:       "Banana",
 		Valor:         2.5,
-		Quantidade:    1,
+		Quantidades: []float64{1},
 		Medida:        "unidade",
 		DataInicio:    "2026-07-20",
 		DataExpiracao: "2026-07-20",
@@ -149,7 +151,7 @@ func TestValidarCandidato_rejeitaDataInicioInvalida(t *testing.T) {
 	c := domain.CandidatoOferta{
 		Produto:       "Banana",
 		Valor:         2.5,
-		Quantidade:    1,
+		Quantidades: []float64{1},
 		Medida:        "unidade",
 		DataInicio:    "20/07/2026",
 		DataExpiracao: "2026-07-20",
@@ -164,7 +166,7 @@ func TestValidarCandidato_rejeitaDataExpiracaoVazia(t *testing.T) {
 	c := domain.CandidatoOferta{
 		Produto:    "Banana",
 		Valor:      2.5,
-		Quantidade: 1,
+		Quantidades: []float64{1},
 		Medida:     "unidade",
 		DataInicio: "2026-07-18",
 	}
@@ -179,7 +181,7 @@ func TestValidarCandidato_aceitaPromocaoClube(t *testing.T) {
 	c := domain.CandidatoOferta{
 		Produto:       "Leite",
 		Valor:         5,
-		Quantidade:    1000,
+		Quantidades: []float64{1000},
 		Medida:        "ml",
 		DataInicio:    "2026-07-18",
 		DataExpiracao: "2026-07-20",
@@ -203,7 +205,7 @@ func TestValidarCandidato_rejeitaPromocaoCartaoEClube(t *testing.T) {
 	c := domain.CandidatoOferta{
 		Produto:       "Leite",
 		Valor:         5,
-		Quantidade:    1000,
+		Quantidades: []float64{1000},
 		Medida:        "ml",
 		DataInicio:    "2026-07-18",
 		DataExpiracao: "2026-07-20",
@@ -223,7 +225,7 @@ func TestValidarCandidato_marcaOpcional(t *testing.T) {
 	c := domain.CandidatoOferta{
 		Produto:       "Banana",
 		Valor:         2.5,
-		Quantidade:    1,
+		Quantidades: []float64{1},
 		Medida:        "unidade",
 		DataInicio: "2026-07-18", DataExpiracao: "2026-07-20",
 	}
@@ -243,7 +245,7 @@ func TestValidarCandidato_aceitaPromocaoLevePague(t *testing.T) {
 		Produto:       "Refrigerante",
 		Marca:         "Cola",
 		Valor:         8,
-		Quantidade:    2000,
+		Quantidades: []float64{2000},
 		Medida:        "ml",
 		DataInicio: "2026-07-18", DataExpiracao: "2026-07-20",
 		Promocao: &domain.Promocao{
@@ -259,5 +261,54 @@ func TestValidarCandidato_aceitaPromocaoLevePague(t *testing.T) {
 	}
 	if oferta.Promocao == nil || oferta.Promocao.ValorPromocional != 12 {
 		t.Fatalf("promocao: %#v", oferta.Promocao)
+	}
+}
+
+func TestValidarCandidato_normalizaQuantidadesDedupSort(t *testing.T) {
+	c := domain.CandidatoOferta{
+		Produto: "Barra de chocolate", Valor: 5.99,
+		Quantidades: []float64{200, 90, 90, 150}, Medida: "g",
+		DataInicio: "2026-07-18", DataExpiracao: "2026-07-20",
+	}
+	oferta, falha := domain.ValidarCandidato(c)
+	if falha != nil {
+		t.Fatalf("esperava ok: %#v", falha)
+	}
+	want := []float64{90, 150, 200}
+	if !reflect.DeepEqual(oferta.Quantidades, want) {
+		t.Fatalf("quantidades: got %#v want %#v", oferta.Quantidades, want)
+	}
+}
+
+func TestValidarCandidato_rejeitaQuantidadesVazias(t *testing.T) {
+	c := domain.CandidatoOferta{
+		Produto: "X", Valor: 1, Quantidades: nil, Medida: "unidade",
+		DataInicio: "2026-07-18", DataExpiracao: "2026-07-20",
+	}
+	_, falha := domain.ValidarCandidato(c)
+	if falha == nil || falha.Codigo != domain.CodigoQuantidadeInvalida {
+		t.Fatalf("esperava quantidade_invalida, got %#v", falha)
+	}
+}
+
+func TestCandidatoOferta_UnmarshalJSON_legadoQuantidade(t *testing.T) {
+	raw := []byte(`{"produto":"Arroz","valor":10,"quantidade":1000,"medida":"g","dataInicio":"2026-07-18","dataExpiracao":"2026-07-20"}`)
+	var c domain.CandidatoOferta
+	if err := json.Unmarshal(raw, &c); err != nil {
+		t.Fatal(err)
+	}
+	if !reflect.DeepEqual(c.Quantidades, []float64{1000}) {
+		t.Fatalf("got %#v", c.Quantidades)
+	}
+}
+
+func TestOferta_UnmarshalJSON_legadoQuantidade(t *testing.T) {
+	raw := []byte(`{"id":"o1","documentoId":"d1","produtoId":"p1","mercadoId":"m1","valor":5,"quantidade":90,"medida":"g","dataInicio":"2026-07-18","dataExpiracao":"2026-07-20","origemDataInicio":"extrator","origemDataExpiracao":"extrator"}`)
+	var o domain.Oferta
+	if err := json.Unmarshal(raw, &o); err != nil {
+		t.Fatal(err)
+	}
+	if !reflect.DeepEqual(o.Quantidades, []float64{90}) {
+		t.Fatalf("got %#v", o.Quantidades)
 	}
 }
