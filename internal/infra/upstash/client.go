@@ -103,6 +103,11 @@ func (c *Client) SAdd(ctx context.Context, key, member string) error {
 	return err
 }
 
+func (c *Client) SRem(ctx context.Context, key, member string) error {
+	_, err := c.Do(ctx, "SREM", key, member)
+	return err
+}
+
 func (c *Client) SMembers(ctx context.Context, key string) ([]string, error) {
 	result, err := c.Do(ctx, "SMEMBERS", key)
 	if err != nil {

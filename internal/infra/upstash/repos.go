@@ -29,7 +29,10 @@ func documentoDiasKey(fonteID domain.FonteID, filename string) string {
 	return fmt.Sprintf("documento:dias:%s:%s", fonteID, filename)
 }
 func ofertasDocKey(id domain.DocumentoID) string { return "ofertas:documento:" + string(id) }
-func falhasDocKey(id domain.DocumentoID) string  { return "falhas:documento:" + string(id) }
+func ofertasProdutoKey(id domain.ProdutoID) string {
+	return "ofertas:produto:" + string(id)
+}
+func falhasDocKey(id domain.DocumentoID) string { return "falhas:documento:" + string(id) }
 
 type MercadoRepo struct{ c *Client }
 
@@ -236,6 +239,26 @@ func (r *OfertaRepo) SaveAll(ctx context.Context, documentoID domain.DocumentoID
 	if ofertas == nil {
 		ofertas = []domain.Oferta{}
 	}
+	prev, err := r.ListByDocumento(ctx, documentoID)
+	if err != nil {
+		return err
+	}
+	prevProdutos := produtoIDsFromOfertas(prev)
+	nextProdutos := produtoIDsFromOfertas(ofertas)
+	docMember := string(documentoID)
+	for pid := range prevProdutos {
+		if _, ok := nextProdutos[pid]; ok {
+			continue
+		}
+		if err := r.c.SRem(ctx, ofertasProdutoKey(pid), docMember); err != nil {
+			return err
+		}
+	}
+	for pid := range nextProdutos {
+		if err := r.c.SAdd(ctx, ofertasProdutoKey(pid), docMember); err != nil {
+			return err
+		}
+	}
 	b, err := json.Marshal(ofertas)
 	if err != nil {
 		return err
@@ -256,6 +279,29 @@ func (r *OfertaRepo) ListByDocumento(ctx context.Context, documentoID domain.Doc
 		return nil, err
 	}
 	return ofertas, nil
+}
+
+func (r *OfertaRepo) ListDocumentoIDsByProduto(ctx context.Context, produtoID domain.ProdutoID) ([]domain.DocumentoID, error) {
+	members, err := r.c.SMembers(ctx, ofertasProdutoKey(produtoID))
+	if err != nil {
+		return nil, err
+	}
+	ids := make([]domain.DocumentoID, 0, len(members))
+	for _, m := range members {
+		ids = append(ids, domain.DocumentoID(m))
+	}
+	return ids, nil
+}
+
+func produtoIDsFromOfertas(ofertas []domain.Oferta) map[domain.ProdutoID]struct{} {
+	out := make(map[domain.ProdutoID]struct{})
+	for _, o := range ofertas {
+		if o.ProdutoID == "" {
+			continue
+		}
+		out[o.ProdutoID] = struct{}{}
+	}
+	return out
 }
 
 type FalhaRepo struct{ c *Client }

@@ -138,26 +138,7 @@ func TestDocumentoRepo_EarliestDia(t *testing.T) {
 }
 
 func TestOfertaRepo_SaveAllReplacesIncludingEmpty(t *testing.T) {
-	store := map[string]string{}
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		var cmd []any
-		_ = json.NewDecoder(r.Body).Decode(&cmd)
-		switch cmd[0].(string) {
-		case "SET":
-			store[cmd[1].(string)] = cmd[2].(string)
-			writeResult(w, "OK")
-		case "GET":
-			v, ok := store[cmd[1].(string)]
-			if !ok {
-				writeRaw(w, "null")
-				return
-			}
-			writeResult(w, v)
-		}
-	}))
-	defer srv.Close()
-
-	repo := upstash.NewOfertaRepo(upstash.NewClient(srv.URL, "t", srv.Client()))
+	repo, _ := newOfertaRepoTestEnv(t)
 	ctx := context.Background()
 	docID := domain.DocumentoID("d1")
 
@@ -175,6 +156,148 @@ func TestOfertaRepo_SaveAllReplacesIncludingEmpty(t *testing.T) {
 	list, _ = repo.ListByDocumento(ctx, docID)
 	if len(list) != 0 {
 		t.Fatalf("want empty after replace, got %d", len(list))
+	}
+}
+
+func TestOfertaRepo_SaveAllIndexesByProduto(t *testing.T) {
+	repo, _ := newOfertaRepoTestEnv(t)
+	ctx := context.Background()
+	docID := domain.DocumentoID("d1")
+
+	err := repo.SaveAll(ctx, docID, []domain.Oferta{
+		{ID: "o1", DocumentoID: docID, ProdutoID: "p1", Valor: 1},
+		{ID: "o2", DocumentoID: docID, ProdutoID: "p2", Valor: 2},
+		{ID: "o3", DocumentoID: docID, ProdutoID: "p1", Valor: 3}, // same produto twice
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	for _, pid := range []domain.ProdutoID{"p1", "p2"} {
+		ids, err := repo.ListDocumentoIDsByProduto(ctx, pid)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(ids) != 1 || ids[0] != docID {
+			t.Fatalf("produto %s: want [%s], got %v", pid, docID, ids)
+		}
+	}
+}
+
+func TestOfertaRepo_SaveAllUpdatesIndexOnResave(t *testing.T) {
+	repo, _ := newOfertaRepoTestEnv(t)
+	ctx := context.Background()
+	docID := domain.DocumentoID("d1")
+
+	if err := repo.SaveAll(ctx, docID, []domain.Oferta{
+		{ID: "o1", DocumentoID: docID, ProdutoID: "p1", Valor: 1},
+		{ID: "o2", DocumentoID: docID, ProdutoID: "p2", Valor: 2},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if err := repo.SaveAll(ctx, docID, []domain.Oferta{
+		{ID: "o3", DocumentoID: docID, ProdutoID: "p2", Valor: 3},
+		{ID: "o4", DocumentoID: docID, ProdutoID: "p3", Valor: 4},
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	assertDocIDs(t, repo, "p1", nil)
+	assertDocIDs(t, repo, "p2", []domain.DocumentoID{docID})
+	assertDocIDs(t, repo, "p3", []domain.DocumentoID{docID})
+}
+
+func TestOfertaRepo_EmptySaveAllClearsIndex(t *testing.T) {
+	repo, _ := newOfertaRepoTestEnv(t)
+	ctx := context.Background()
+	docID := domain.DocumentoID("d1")
+
+	if err := repo.SaveAll(ctx, docID, []domain.Oferta{
+		{ID: "o1", DocumentoID: docID, ProdutoID: "p1", Valor: 1},
+		{ID: "o2", DocumentoID: docID, ProdutoID: "p2", Valor: 2},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if err := repo.SaveAll(ctx, docID, nil); err != nil {
+		t.Fatal(err)
+	}
+
+	assertDocIDs(t, repo, "p1", nil)
+	assertDocIDs(t, repo, "p2", nil)
+	list, err := repo.ListByDocumento(ctx, docID)
+	if err != nil || len(list) != 0 {
+		t.Fatalf("blob want empty, got %v err=%v", list, err)
+	}
+}
+
+func newOfertaRepoTestEnv(t *testing.T) (*upstash.OfertaRepo, *httptest.Server) {
+	t.Helper()
+	store := map[string]string{}
+	sets := map[string]map[string]struct{}{}
+	var mu sync.Mutex
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var cmd []any
+		if err := json.NewDecoder(r.Body).Decode(&cmd); err != nil {
+			t.Fatal(err)
+		}
+		mu.Lock()
+		defer mu.Unlock()
+		switch cmd[0].(string) {
+		case "SET":
+			store[cmd[1].(string)] = cmd[2].(string)
+			writeResult(w, "OK")
+		case "GET":
+			v, ok := store[cmd[1].(string)]
+			if !ok {
+				writeRaw(w, "null")
+				return
+			}
+			writeResult(w, v)
+		case "SADD":
+			key := cmd[1].(string)
+			if sets[key] == nil {
+				sets[key] = map[string]struct{}{}
+			}
+			sets[key][cmd[2].(string)] = struct{}{}
+			writeResult(w, 1)
+		case "SREM":
+			key := cmd[1].(string)
+			delete(sets[key], cmd[2].(string))
+			writeResult(w, 1)
+		case "SMEMBERS":
+			key := cmd[1].(string)
+			var members []string
+			for m := range sets[key] {
+				members = append(members, m)
+			}
+			b, _ := json.Marshal(members)
+			writeRaw(w, string(b))
+		default:
+			t.Fatalf("unexpected op %s", cmd[0])
+		}
+	}))
+	t.Cleanup(srv.Close)
+	return upstash.NewOfertaRepo(upstash.NewClient(srv.URL, "t", srv.Client())), srv
+}
+
+func assertDocIDs(t *testing.T, repo *upstash.OfertaRepo, produtoID domain.ProdutoID, want []domain.DocumentoID) {
+	t.Helper()
+	got, err := repo.ListDocumentoIDsByProduto(context.Background(), produtoID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(got) != len(want) {
+		t.Fatalf("produto %s: want %v, got %v", produtoID, want, got)
+	}
+	set := map[domain.DocumentoID]struct{}{}
+	for _, id := range got {
+		set[id] = struct{}{}
+	}
+	for _, id := range want {
+		if _, ok := set[id]; !ok {
+			t.Fatalf("produto %s: missing %s in %v", produtoID, id, got)
+		}
 	}
 }
 

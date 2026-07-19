@@ -152,7 +152,6 @@ func processDocumento(
 			MercadoID: fonte.MercadoID,
 			Filename:  pdf.Filename,
 			Dia:       dia,
-			Estado:    domain.EstadoDescoberto,
 		}
 	}
 

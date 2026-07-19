@@ -110,18 +110,58 @@ func (m *memMarcas) Save(_ context.Context, x domain.Marca) error {
 }
 
 type memOfertas struct {
-	byDoc map[domain.DocumentoID][]domain.Oferta
+	byDoc     map[domain.DocumentoID][]domain.Oferta
+	byProduto map[domain.ProdutoID]map[domain.DocumentoID]struct{}
 }
 
 func (m *memOfertas) SaveAll(_ context.Context, id domain.DocumentoID, ofertas []domain.Oferta) error {
 	if m.byDoc == nil {
 		m.byDoc = map[domain.DocumentoID][]domain.Oferta{}
 	}
+	if m.byProduto == nil {
+		m.byProduto = map[domain.ProdutoID]map[domain.DocumentoID]struct{}{}
+	}
+	prev := produtoIDsFromOfertas(m.byDoc[id])
+	next := produtoIDsFromOfertas(ofertas)
+	for pid := range prev {
+		if _, ok := next[pid]; ok {
+			continue
+		}
+		delete(m.byProduto[pid], id)
+		if len(m.byProduto[pid]) == 0 {
+			delete(m.byProduto, pid)
+		}
+	}
+	for pid := range next {
+		if m.byProduto[pid] == nil {
+			m.byProduto[pid] = map[domain.DocumentoID]struct{}{}
+		}
+		m.byProduto[pid][id] = struct{}{}
+	}
 	m.byDoc[id] = ofertas
 	return nil
 }
 func (m *memOfertas) ListByDocumento(_ context.Context, id domain.DocumentoID) ([]domain.Oferta, error) {
 	return m.byDoc[id], nil
+}
+func (m *memOfertas) ListDocumentoIDsByProduto(_ context.Context, produtoID domain.ProdutoID) ([]domain.DocumentoID, error) {
+	set := m.byProduto[produtoID]
+	ids := make([]domain.DocumentoID, 0, len(set))
+	for id := range set {
+		ids = append(ids, id)
+	}
+	return ids, nil
+}
+
+func produtoIDsFromOfertas(ofertas []domain.Oferta) map[domain.ProdutoID]struct{} {
+	out := make(map[domain.ProdutoID]struct{})
+	for _, o := range ofertas {
+		if o.ProdutoID == "" {
+			continue
+		}
+		out[o.ProdutoID] = struct{}{}
+	}
+	return out
 }
 
 type memFalhas struct {

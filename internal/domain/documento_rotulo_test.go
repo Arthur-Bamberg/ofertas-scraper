@@ -57,4 +57,11 @@ func TestDeveReprocessar(t *testing.T) {
 	if !domain.DeveReprocessar(domain.EstadoFalhou) {
 		t.Fatal("falhou deve reprocessar")
 	}
+	if !domain.DeveReprocessar(domain.EstadoProcessando) {
+		t.Fatal("processando órfão deve reprocessar")
+	}
+	// Legacy Redis value — unknown states hit default (no special-case).
+	if !domain.DeveReprocessar(domain.EstadoDocumento("descoberto")) {
+		t.Fatal("estado legado desconhecido deve reprocessar")
+	}
 }

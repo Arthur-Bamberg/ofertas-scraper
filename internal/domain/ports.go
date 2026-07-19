@@ -105,6 +105,8 @@ type DocumentoRepository interface {
 type OfertaRepository interface {
 	SaveAll(ctx context.Context, documentoID DocumentoID, ofertas []Oferta) error
 	ListByDocumento(ctx context.Context, documentoID DocumentoID) ([]Oferta, error)
+	// ListDocumentoIDsByProduto returns Documento ids indexed under ofertas:produto:{produtoId} (ADR 0026).
+	ListDocumentoIDsByProduto(ctx context.Context, produtoID ProdutoID) ([]DocumentoID, error)
 }
 
 type FalhaExtracaoRepository interface {

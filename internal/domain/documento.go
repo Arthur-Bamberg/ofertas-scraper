@@ -3,7 +3,6 @@ package domain
 type EstadoDocumento string
 
 const (
-	EstadoDescoberto  EstadoDocumento = "descoberto"
 	EstadoProcessando EstadoDocumento = "processando"
 	EstadoConcluido   EstadoDocumento = "concluido"
 	EstadoParcial     EstadoDocumento = "parcial"
