@@ -67,7 +67,7 @@ Required ports (names may vary; responsibilities must not):
 - **ArtefatoStore** — save/load Artefatos (local now; bucket later behind same interface)
 - **FonteClient** — HTTP GET + PDF name discovery
 - **Rasterizer** — PDF bytes → downscaled page images
-- **FilenameDateParser** — parse of `dataExpiracao` from Documento filename (when Fonte has fallback enabled or auto-enabled — ADR 0025)
+- **FilenameDateParser** — parse of vigência (`dataInicio` / `dataExpiracao`) from Documento filename (ADR 0028); DocumentoRepository.EarliestDia for primeira descoberta
 
 ## Documento lifecycle
 
@@ -93,12 +93,11 @@ Same-day re-run: skip `concluido` and `parcial`; retry `falhou` and orphan `proc
 
 ### Oferta rules agents must respect
 
-- Extrator candidates include `produto`, optional `marca`, `categorias[]`, plus `valor` / `quantidade` / `medida` / `dataExpiracao` / optional `promocao` (see ADR 0010); persisted Oferta stores `produtoId`, `mercadoId`, and optional `marcaId` after match-or-create (ADR 0015)
+- Extrator candidates include `produto`, optional `marca`, `categorias[]`, plus `valor` / `quantidade` / `medida` / `dataInicio` / `dataExpiracao` / optional `promocao` (see ADR 0010); persisted Oferta stores `produtoId`, `mercadoId`, optional `marcaId`, vigência + `origemDataInicio` / `origemDataExpiracao` after match-or-create (ADR 0015, 0028)
 - `medida` is only `g` | `ml` | `unidade`
 - Extrator must normalize **kg → 1000 g** and **L → 1000 ml** (adjust `quantidade`) before output; domain does **not** convert — any other `medida` is a Falha de Extração (see ADR 0004; hybrid domain safety-net deferred)
-- `dataExpiracao` = end of validity on the flyer (not discovery day); Extrator contract requires it; if missing/empty, auto-enable `fallbackDataExpiracaoFilename` on the Fonte and parse from Documento filename in the same attempt; Extrator always wins when present (ADR 0025, supersedes 0013); past dates are valid (price history — ADR 0016)
-- `promocao` is optional and one of three shapes (leve/pague, quantidade+valor, cartão)
-- Fonte field `fallbackDataExpiracaoFilename` defaults to `false`; auto-enabled when a candidate arrives without `dataExpiracao` (ADR 0025)
+- `dataInicio` / `dataExpiracao` = vigência no encarte; both required in Extrator contract; cascades always on (ADR 0028): Extrator wins when present; missing início → distinct start in filename → primeira descoberta na Fonte; missing fim → filename end, else Falha; past/future dates OK (ADR 0016); `dataInicio` ≤ `dataExpiracao`
+- `promocao` is optional and one of four shapes (leve/pague, quantidade+valor, cartão, clube — ADR 0029)
 - Domain match-or-create for Produto/Marca uses normalized exact label match only (ADR 0011); no fuzzy matching in the MVP
 
 ## Artefatos

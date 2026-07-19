@@ -212,10 +212,17 @@ func processDocumento(
 		return fail(fmt.Sprintf("artefato raw: %v", err))
 	}
 
-	for i := range candidatos {
-		candidatos[i] = AplicarFallbackDataExpiracao(candidatos[i], fonte, pdf.Filename, d.Dates)
+	primeiroDia := dia
+	if earliest, ok, err := d.Documentos.EarliestDia(ctx, fonte.ID, pdf.Filename); err != nil {
+		return fmt.Errorf("%w: earliest dia: %v", errGlobalInfra, err)
+	} else if ok && earliest != "" {
+		primeiroDia = earliest
 	}
-	validas, falhas, estado := ValidarExtracao(candidatos)
+	resolvidos := make([]CandidatoResolvido, len(candidatos))
+	for i, c := range candidatos {
+		resolvidos[i] = ResolverVigencia(c, pdf.Filename, d.Dates, primeiroDia)
+	}
+	validas, falhas, estado := ValidarExtracaoResolvida(resolvidos)
 
 	ofertas, err := PersistirOfertasValidas(ctx, d.Produtos, d.Marcas, doc, validas)
 	if err != nil {

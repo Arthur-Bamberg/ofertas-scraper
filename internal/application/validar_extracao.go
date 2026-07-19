@@ -2,27 +2,34 @@ package application
 
 import "ofertas-scraper/internal/domain"
 
-// ValidarExtracao validates Extrator candidates and derives Documento terminal state.
+// ValidarExtracao validates candidates that already carry dates (assumes origem extrator).
 func ValidarExtracao(candidatos []domain.CandidatoOferta) (validas []domain.OfertaValidada, falhas []domain.FalhaExtracao, estado domain.EstadoDocumento) {
-	for _, c := range candidatos {
-		oferta, falha := domain.ValidarCandidato(c)
+	resolvidos := make([]CandidatoResolvido, len(candidatos))
+	for i, c := range candidatos {
+		r := CandidatoResolvido{Candidato: c}
+		if c.DataInicio != "" {
+			r.OrigemDataInicio = domain.OrigemExtrator
+		}
+		if c.DataExpiracao != "" {
+			r.OrigemDataExpiracao = domain.OrigemExtrator
+		}
+		resolvidos[i] = r
+	}
+	return ValidarExtracaoResolvida(resolvidos)
+}
+
+// ValidarExtracaoResolvida validates candidates that already have vigência/origens resolved.
+func ValidarExtracaoResolvida(resolvidos []CandidatoResolvido) (validas []domain.OfertaValidada, falhas []domain.FalhaExtracao, estado domain.EstadoDocumento) {
+	for _, r := range resolvidos {
+		oferta, falha := domain.ValidarCandidato(r.Candidato)
 		if falha != nil {
 			falhas = append(falhas, *falha)
 			continue
 		}
+		oferta.OrigemDataInicio = r.OrigemDataInicio
+		oferta.OrigemDataExpiracao = r.OrigemDataExpiracao
 		validas = append(validas, oferta)
 	}
 	estado = domain.EstadoAposValidacao(len(validas), len(falhas))
 	return validas, falhas, estado
-}
-
-// AplicarFallbackDataExpiracao fills empty dataExpiracao from filename when Fonte allows it (ADR 0013).
-func AplicarFallbackDataExpiracao(c domain.CandidatoOferta, fonte domain.Fonte, filename string, parser domain.FilenameDateParser) domain.CandidatoOferta {
-	if c.DataExpiracao != "" || !fonte.FallbackDataExpiracaoFilename || parser == nil {
-		return c
-	}
-	if date, ok := parser.Parse(filename); ok {
-		c.DataExpiracao = date
-	}
-	return c
 }

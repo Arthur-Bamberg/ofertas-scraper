@@ -18,7 +18,9 @@ const (
 	CodigoProdutoInvalido        = "produto_invalido"
 	CodigoValorInvalido          = "valor_invalido"
 	CodigoQuantidadeInvalida     = "quantidade_invalida"
+	CodigoDataInicioInvalida     = "data_inicio_invalida"
 	CodigoDataExpiracaoInvalida  = "data_expiracao_invalida"
+	CodigoVigenciaInvalida       = "vigencia_invalida"
 	CodigoPromocaoInvalida       = "promocao_invalida"
 )
 
@@ -30,20 +32,24 @@ type CandidatoOferta struct {
 	Valor         float64   `json:"valor"`
 	Quantidade    float64   `json:"quantidade"`
 	Medida        string    `json:"medida"`
+	DataInicio    string    `json:"dataInicio"`
 	DataExpiracao string    `json:"dataExpiracao"`
 	Promocao      *Promocao `json:"promocao,omitempty"`
 }
 
 // OfertaValidada is a candidate that passed domain validation (labels, not ids).
 type OfertaValidada struct {
-	Produto       string
-	Marca         string
-	Categorias    []string
-	Valor         float64
-	Quantidade    float64
-	Medida        Medida
-	DataExpiracao string
-	Promocao      *Promocao
+	Produto             string
+	Marca               string
+	Categorias          []string
+	Valor               float64
+	Quantidade          float64
+	Medida              Medida
+	DataInicio          string
+	DataExpiracao       string
+	OrigemDataInicio    OrigemData
+	OrigemDataExpiracao OrigemData
+	Promocao            *Promocao
 }
 
 type Promocao struct {
@@ -51,6 +57,7 @@ type Promocao struct {
 	Pague              *float64 `json:"pague,omitempty"`
 	QuantidadePromocao *float64 `json:"quantidadePromocao,omitempty"`
 	PromocaoCartao     *bool    `json:"promocaoCartao,omitempty"`
+	PromocaoClube      *bool    `json:"promocaoClube,omitempty"`
 	ValorPromocional   float64  `json:"valorPromocional"`
 }
 
@@ -79,8 +86,16 @@ func ValidarCandidato(c CandidatoOferta) (OfertaValidada, *FalhaExtracao) {
 		return falha(c, CodigoMedidaInvalida, "medida deve ser g, ml ou unidade")
 	}
 
-	if _, err := time.Parse("2006-01-02", c.DataExpiracao); err != nil {
+	inicio, err := time.Parse("2006-01-02", c.DataInicio)
+	if err != nil {
+		return falha(c, CodigoDataInicioInvalida, "dataInicio deve ser YYYY-MM-DD")
+	}
+	fim, err := time.Parse("2006-01-02", c.DataExpiracao)
+	if err != nil {
 		return falha(c, CodigoDataExpiracaoInvalida, "dataExpiracao deve ser YYYY-MM-DD")
+	}
+	if inicio.After(fim) {
+		return falha(c, CodigoVigenciaInvalida, "dataInicio deve ser ≤ dataExpiracao")
 	}
 
 	if falhaPromo := validarPromocao(c); falhaPromo != nil {
@@ -94,6 +109,7 @@ func ValidarCandidato(c CandidatoOferta) (OfertaValidada, *FalhaExtracao) {
 		Valor:         c.Valor,
 		Quantidade:    c.Quantidade,
 		Medida:        medida,
+		DataInicio:    c.DataInicio,
 		DataExpiracao: c.DataExpiracao,
 		Promocao:      c.Promocao,
 	}, nil
@@ -128,22 +144,41 @@ func validarPromocao(c CandidatoOferta) *FalhaExtracao {
 	levePague := p.Leve != nil || p.Pague != nil
 	qtd := p.QuantidadePromocao != nil
 	cartao := p.PromocaoCartao != nil
+	clube := p.PromocaoClube != nil
+	n := 0
+	if levePague {
+		n++
+	}
+	if qtd {
+		n++
+	}
+	if cartao {
+		n++
+	}
+	if clube {
+		n++
+	}
+	if n != 1 {
+		return &FalhaExtracao{Codigo: CodigoPromocaoInvalida, Detalhe: "promocao deve ser exatamente um dos quatro formatos", Candidato: c}
+	}
 
 	switch {
-	case levePague && !qtd && !cartao:
+	case levePague:
 		if p.Leve == nil || p.Pague == nil || *p.Leve <= 0 || *p.Pague <= 0 {
 			return &FalhaExtracao{Codigo: CodigoPromocaoInvalida, Detalhe: "leve/pague inválidos", Candidato: c}
 		}
-	case qtd && !levePague && !cartao:
+	case qtd:
 		if *p.QuantidadePromocao <= 0 {
 			return &FalhaExtracao{Codigo: CodigoPromocaoInvalida, Detalhe: "quantidadePromocao inválida", Candidato: c}
 		}
-	case cartao && !levePague && !qtd:
+	case cartao:
 		if !*p.PromocaoCartao {
 			return &FalhaExtracao{Codigo: CodigoPromocaoInvalida, Detalhe: "promocaoCartao deve ser true", Candidato: c}
 		}
-	default:
-		return &FalhaExtracao{Codigo: CodigoPromocaoInvalida, Detalhe: "promocao deve ser exatamente um dos três formatos", Candidato: c}
+	case clube:
+		if !*p.PromocaoClube {
+			return &FalhaExtracao{Codigo: CodigoPromocaoInvalida, Detalhe: "promocaoClube deve ser true", Candidato: c}
+		}
 	}
 	return nil
 }

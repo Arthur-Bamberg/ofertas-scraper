@@ -5,8 +5,8 @@ Sistema que coleta PDFs de Fontes de ofertas, rasteriza páginas em imagens, ext
 ## Language
 
 **Oferta**:
-Observação de preço extraída de um Documento: valor, quantidade, medida, data de expiração (fim da validade no encarte; pode estar no passado para histórico) e promoção opcional; refere-se a um Produto em um Mercado, com Marca opcional. O histórico de preços de um Produto é o conjunto de Ofertas ao longo do tempo (via Documentos); o “período atual” é filtro do consumidor da base, não um estado embutido no Produto.
-_Avoid_: Deal, item, listing, produto, histórico de produto (como entidade separada)
+Observação de preço extraída de um Documento: valor, quantidade, medida, `dataInicio` e `dataExpiracao` (vigência no encarte; `dataInicio` ≤ `dataExpiracao`; a expiração pode estar no passado para histórico; ambas podem ser futuras) e promoção opcional; refere-se a um Produto em um Mercado, com Marca opcional. Cada data carrega origem (`origemDataInicio` / `origemDataExpiracao`) com valor `extrator`, `filename` ou — só no início — `primeiraDescoberta`. Cascata de `dataInicio`: Extrator → início distinto no nome (incl. intervalo no filename; token ISO único não conta como início) → dia da primeira descoberta na Fonte (menor dia de qualquer Documento com aquele nome na Fonte, independente do estado). Cascata de `dataExpiracao`: Extrator → fim no nome (intervalo ou token ISO; sempre tentada; sem flag na Fonte); se ambas falharem, Falha de Extração — sem inventar fim. As duas cascatas são independentes. Toda Oferta tem `dataInicio`, `dataExpiracao` e as duas origens — não há forma legítima sem esses campos. O histórico de preços de um Produto é o conjunto de Ofertas ao longo do tempo (via Documentos); o “período atual” é filtro do consumidor da base, não um estado embutido no Produto.
+_Avoid_: Deal, item, listing, produto, histórico de produto (como entidade separada), dataComeço, vigenciaInicio
 
 **Produto**:
 Identidade de catálogo do que está à venda, sem marca (ex.: “Arroz integral”, “Arroz branco parboilizado”); carrega categorias taxonômicas para navegação e agregação. Distinta por tipo vendável; N Marcas aparecem via Ofertas, não como lista fixa no Produto.
@@ -21,8 +21,8 @@ Rótulo taxonômico de um Produto para filtrar e agrupar (ex.: mercearia, grãos
 _Avoid_: tipo, variante, tag solta na Oferta
 
 **Fonte**:
-URL configurada e persistida cuja resposta revela URLs de PDFs (HTML/JS/JSON); o nome do arquivo identifica o Documento e o download usa a URL do link. Pode apontar para página HTML ou endpoint JSON de ofertas. Pertence a um Mercado; pode incluir filtro opcional por regex sobre o nome do Documento. Pode obter `dataExpiracao` a partir do nome do arquivo quando o Extrator omite a data (`fallbackDataExpiracaoFilename` na Fonte, não no Mercado): a flag começa desligada e liga-se automaticamente ao aparecer um candidato sem data; o fallback aplica-se já na mesma tentativa. Se o Extrator envia a data, ela prevalece.
-_Avoid_: Site, link, URL, origem
+URL configurada e persistida cuja resposta revela URLs de PDFs (HTML/JS/JSON); o nome do arquivo identifica o Documento e o download usa a URL do link. Pode apontar para página HTML ou endpoint JSON de ofertas. Pertence a um Mercado; pode incluir filtro opcional por regex sobre o nome do Documento. Fallbacks de vigência (filename / primeira descoberta) são sempre ativos — não há flag por Fonte. Se o Extrator envia a data, ela prevalece.
+_Avoid_: Site, link, URL, origem (como sinônimo de Fonte)
 
 **Mercado**:
 Identidade comercial (rede ou bandeira) à qual uma Fonte pertence; sujeito da comparação de Ofertas e do histórico de preços entre estabelecimentos. Não é extraído das imagens — vem da configuração da Fonte.
@@ -33,7 +33,7 @@ PDF identificado em uma Fonte pelo nome do arquivo e pelo dia da descoberta; ras
 _Avoid_: PDF, arquivo, anexo, descoberto (como estado persistido)
 
 **Extrator**:
-Capacidade de obter candidatos a Oferta a partir das imagens de um Documento (rótulos de produto, marca e categorias, mais preço, data de expiração e promoção). Espera-se `dataExpiracao` em todo candidato; ausência é tratada via fallback de filename na Fonte.
+Capacidade de obter candidatos a Oferta a partir das imagens de um Documento (rótulos de produto, marca e categorias, mais preço, `dataInicio`, `dataExpiracao` e promoção). Espera-se as duas datas em todo candidato; ausências são preenchidas pelos fallbacks de vigência (a origem fica na Oferta, não na saída do Extrator).
 _Avoid_: Gemini, IA, conversor, parser, LLM
 
 **Medida**:
@@ -41,8 +41,8 @@ Unidade de quantidade de uma Oferta, sempre normalizada para `g`, `ml` ou `unida
 _Avoid_: unidade de medida, kg, litro, L
 
 **Promoção**:
-Condição comercial opcional de uma Oferta: leve/pague, quantidade com valor promocional, ou preço exclusivo de cartão.
-_Avoid_: desconto, oferta especial, deal
+Condição comercial opcional de uma Oferta, exatamente um formato: leve/pague, quantidade com valor promocional, preço exclusivo de cartão (`promocaoCartao`), ou preço exclusivo de clube/fidelidade/app (`promocaoClube`). Cartão e clube são formatos distintos — não se unificam num vínculo genérico.
+_Avoid_: desconto, oferta especial, deal, vínculo, canal
 
 **Falha de Extração**:
 Registro de uma tentativa de Oferta que não passou na validação, vinculada ao Documento de origem: código estável do motivo, detalhe livre opcional e cópia do candidato rejeitado.

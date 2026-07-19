@@ -37,16 +37,19 @@ func PersistirOfertasValidas(
 			marcaID = &id
 		}
 		out = append(out, domain.Oferta{
-			ID:            domain.OfertaID(NewID()),
-			DocumentoID:   doc.ID,
-			ProdutoID:     produto.ID,
-			MarcaID:       marcaID,
-			MercadoID:     doc.MercadoID,
-			Valor:         v.Valor,
-			Quantidade:    v.Quantidade,
-			Medida:        v.Medida,
-			DataExpiracao: v.DataExpiracao,
-			Promocao:      v.Promocao,
+			ID:                  domain.OfertaID(NewID()),
+			DocumentoID:         doc.ID,
+			ProdutoID:           produto.ID,
+			MarcaID:             marcaID,
+			MercadoID:           doc.MercadoID,
+			Valor:               v.Valor,
+			Quantidade:          v.Quantidade,
+			Medida:              v.Medida,
+			DataInicio:          v.DataInicio,
+			DataExpiracao:       v.DataExpiracao,
+			OrigemDataInicio:    v.OrigemDataInicio,
+			OrigemDataExpiracao: v.OrigemDataExpiracao,
+			Promocao:            v.Promocao,
 		})
 	}
 	return out, nil

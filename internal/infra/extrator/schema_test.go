@@ -35,7 +35,7 @@ func TestLoadGeminiResponseSchema(t *testing.T) {
 	}
 	promo, _ := oferta["properties"].(map[string]any)["promocao"].(map[string]any)
 	oneOf, _ := promo["oneOf"].([]any)
-	if len(oneOf) != 3 {
+	if len(oneOf) != 4 {
 		t.Fatalf("promocao oneOf len=%d", len(oneOf))
 	}
 	cartao := oneOf[2].(map[string]any)
@@ -46,6 +46,22 @@ func TestLoadGeminiResponseSchema(t *testing.T) {
 	}
 	if cartaoField["enum"] == nil {
 		t.Fatalf("expected enum for promocaoCartao: %#v", cartaoField)
+	}
+	clube := oneOf[3].(map[string]any)
+	clubeProps := clube["properties"].(map[string]any)
+	clubeField := clubeProps["promocaoClube"].(map[string]any)
+	if clubeField["enum"] == nil {
+		t.Fatalf("expected enum for promocaoClube: %#v", clubeField)
+	}
+	required, _ := oferta["required"].([]any)
+	hasInicio := false
+	for _, r := range required {
+		if r == "dataInicio" {
+			hasInicio = true
+		}
+	}
+	if !hasInicio {
+		t.Fatalf("dataInicio must be required: %#v", required)
 	}
 }
 

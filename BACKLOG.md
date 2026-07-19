@@ -5,7 +5,7 @@ Itens futuros — fora do escopo do MVP atual. Não são compromissos de sprint;
 ## Próxima implementação (ordem acordada)
 
 1. [x] Adaptador Gemini do Extrator (prompt cache + structured output) — ADR 0023; stub via `EXTRATOR_STUB=1`.
-2. [ ] Auto-enable `fallbackDataExpiracaoFilename` na Fonte + aplicar na mesma tentativa (ADR 0025).
+2. [x] Vigência `dataInicio` + origens + fallbacks sempre ativos; remove flag na Fonte (ADR 0028). Promoção clube (ADR 0029).
 3. [ ] Índice Redis `ofertas:produto:{produtoId}` → documentoIds (ADR 0026).
 4. [ ] Higiene: remover estado persistido `descoberto` do código/docs restantes (glossário já alinhado).
 

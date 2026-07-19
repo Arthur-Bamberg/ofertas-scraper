@@ -18,11 +18,10 @@ type Mercado struct {
 }
 
 type Fonte struct {
-	ID                            FonteID   `json:"id"`
-	MercadoID                     MercadoID `json:"mercadoId"`
-	URL                           string    `json:"url"`
-	FiltroNomeDocumento           string    `json:"filtroNomeDocumento"`
-	FallbackDataExpiracaoFilename bool      `json:"fallbackDataExpiracaoFilename"`
+	ID                  FonteID   `json:"id"`
+	MercadoID           MercadoID `json:"mercadoId"`
+	URL                 string    `json:"url"`
+	FiltroNomeDocumento string    `json:"filtroNomeDocumento"`
 }
 
 type Produto struct {
@@ -49,18 +48,30 @@ type Documento struct {
 	Atualizado time.Time       `json:"atualizado"`
 }
 
+// OrigemData records how a vigência date was obtained (ADR 0028).
+type OrigemData string
+
+const (
+	OrigemExtrator           OrigemData = "extrator"
+	OrigemFilename           OrigemData = "filename"
+	OrigemPrimeiraDescoberta OrigemData = "primeiraDescoberta"
+)
+
 // Oferta is the persisted price observation (after match-or-create).
 type Oferta struct {
-	ID            OfertaID  `json:"id"`
-	DocumentoID   DocumentoID `json:"documentoId"`
-	ProdutoID     ProdutoID `json:"produtoId"`
-	MarcaID       *MarcaID  `json:"marcaId,omitempty"`
-	MercadoID     MercadoID `json:"mercadoId"`
-	Valor         float64   `json:"valor"`
-	Quantidade    float64   `json:"quantidade"`
-	Medida        Medida    `json:"medida"`
-	DataExpiracao string    `json:"dataExpiracao"`
-	Promocao      *Promocao `json:"promocao,omitempty"`
+	ID                  OfertaID    `json:"id"`
+	DocumentoID         DocumentoID `json:"documentoId"`
+	ProdutoID           ProdutoID   `json:"produtoId"`
+	MarcaID             *MarcaID    `json:"marcaId,omitempty"`
+	MercadoID           MercadoID   `json:"mercadoId"`
+	Valor               float64     `json:"valor"`
+	Quantidade          float64     `json:"quantidade"`
+	Medida              Medida      `json:"medida"`
+	DataInicio          string      `json:"dataInicio"`
+	DataExpiracao       string      `json:"dataExpiracao"`
+	OrigemDataInicio    OrigemData  `json:"origemDataInicio"`
+	OrigemDataExpiracao OrigemData  `json:"origemDataExpiracao"`
+	Promocao            *Promocao   `json:"promocao,omitempty"`
 }
 
 type MercadoRepository interface {
@@ -87,6 +98,8 @@ type MarcaRepository interface {
 type DocumentoRepository interface {
 	GetByIdentity(ctx context.Context, fonteID FonteID, filename, dia string) (Documento, bool, error)
 	Save(ctx context.Context, d Documento) error
+	// EarliestDia is the smallest discovery day for Fonte+filename (any Documento state).
+	EarliestDia(ctx context.Context, fonteID FonteID, filename string) (dia string, ok bool, err error)
 }
 
 type OfertaRepository interface {
@@ -129,7 +142,13 @@ type Rasterizer interface {
 	Rasterize(ctx context.Context, pdf []byte) ([]PageImage, error)
 }
 
-// FilenameDateParser parses dataExpiracao from a Documento filename when Fonte enables fallback.
+// FilenameVigencia holds optional start/end dates parsed from a Documento filename (ADR 0028).
+type FilenameVigencia struct {
+	DataInicio    string // empty when no distinct start
+	DataExpiracao string // empty when no end token
+}
+
+// FilenameDateParser extracts vigência hints from a Documento filename.
 type FilenameDateParser interface {
-	Parse(filename string) (dateYYYYMMDD string, ok bool)
+	Parse(filename string) FilenameVigencia
 }

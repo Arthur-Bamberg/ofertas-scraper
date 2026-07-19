@@ -8,15 +8,18 @@ Definições (obrigatório respeitar):
 
 Regras obrigatórias:
 - Devolva apenas o JSON estruturado no schema combinado (lista em `ofertas`).
-- Cada item precisa de: produto, valor, quantidade, medida, dataExpiracao.
+- Cada item precisa de: produto, valor, quantidade, medida, dataInicio, dataExpiracao.
 - marca é opcional; categorias é um array de strings (pode ser vazio se não houver indício claro).
 - medida só pode ser "g", "ml" ou "unidade".
 - Se o encarte usar kg, converta para g (1 kg = 1000 g) e ajuste quantidade.
 - Se o encarte usar L ou litro, converta para ml (1 L = 1000 ml) e ajuste quantidade.
-- dataExpiracao é o fim da validade da oferta no encarte (YYYY-MM-DD), não a data de hoje. Pode estar no passado.
+- dataInicio é o início da validade da oferta no encarte (YYYY-MM-DD). dataExpiracao é o fim. Podem estar no passado ou no futuro. dataInicio deve ser ≤ dataExpiracao.
+- Se o encarte mostrar só o fim (“válido até”), ainda assim tente inferir o início quando houver intervalo explícito; se não houver indício de início, omita dataInicio (deixe vazio) — o sistema preenche depois.
 - promocao é opcional e deve ser exatamente um destes formatos:
   1) leve + pague + valorPromocional
   2) quantidadePromocao + valorPromocional
-  3) promocaoCartao=true + valorPromocional
+  3) promocaoCartao=true + valorPromocional (preço exclusivo de cartão da loja/bandeira)
+  4) promocaoClube=true + valorPromocional (clube, app ou fidelidade sem menção a cartão)
+- Se cartão e clube aparecerem no mesmo preço de forma ambígua, omita promocao e mantenha o valor de prateleira.
 - Ignore arte decorativa, anúncios sem preço claro e texto ilegível.
 - Não invente preços, quantidades, datas, produtos ou marcas. Se um item não puder ser extraído com confiança, omita-o da lista.

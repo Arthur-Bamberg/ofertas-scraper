@@ -58,6 +58,25 @@ func (m *memDocs) Save(_ context.Context, d domain.Documento) error {
 	return nil
 }
 
+func (m *memDocs) EarliestDia(_ context.Context, fonteID domain.FonteID, filename string) (string, bool, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	var earliest string
+	prefix := string(fonteID) + "|" + filename + "|"
+	for k := range m.idx {
+		if len(k) > len(prefix) && k[:len(prefix)] == prefix {
+			dia := k[len(prefix):]
+			if earliest == "" || dia < earliest {
+				earliest = dia
+			}
+		}
+	}
+	if earliest == "" {
+		return "", false, nil
+	}
+	return earliest, true, nil
+}
+
 type memProdutos struct {
 	byNorm map[string]domain.Produto
 }
@@ -166,7 +185,8 @@ func TestRunDailyJob_PersistsValidOferta(t *testing.T) {
 		},
 		Raster: raster.Fixed{Pages: []domain.PageImage{{Page: 1, JPEG: []byte{0xff, 0xd8}}}},
 		Extrator: extrator.Stub{Candidatos: []domain.CandidatoOferta{{
-			Produto: "Arroz", Valor: 10, Quantidade: 1000, Medida: "g", DataExpiracao: "2026-07-25",
+			Produto: "Arroz", Valor: 10, Quantidade: 1000, Medida: "g",
+			DataInicio: "2026-07-18", DataExpiracao: "2026-07-25",
 		}}},
 		Artefatos: memArtefatos{},
 		Dates:     filenamedate.Parser{},
@@ -186,8 +206,15 @@ func TestRunDailyJob_PersistsValidOferta(t *testing.T) {
 	if doc.Estado != domain.EstadoConcluido {
 		t.Fatalf("estado=%s ultimoErro=%s", doc.Estado, doc.UltimoErro)
 	}
-	if len(ofertas.byDoc[doc.ID]) != 1 {
-		t.Fatalf("ofertas=%v", ofertas.byDoc[doc.ID])
+	got := ofertas.byDoc[doc.ID]
+	if len(got) != 1 {
+		t.Fatalf("ofertas=%v", got)
+	}
+	if got[0].DataInicio != "2026-07-18" || got[0].DataExpiracao != "2026-07-25" {
+		t.Fatalf("vigencia=%s..%s", got[0].DataInicio, got[0].DataExpiracao)
+	}
+	if got[0].OrigemDataInicio != domain.OrigemExtrator || got[0].OrigemDataExpiracao != domain.OrigemExtrator {
+		t.Fatalf("origens=%s/%s", got[0].OrigemDataInicio, got[0].OrigemDataExpiracao)
 	}
 }
 
@@ -284,7 +311,8 @@ func TestRunDailyJob_OnlyFonteID(t *testing.T) {
 		Raster: raster.Fixed{Pages: []domain.PageImage{{Page: 1, JPEG: []byte{0xff, 0xd8}}}},
 		Extrator: &countingExtrator{
 			inner: extrator.Stub{Candidatos: []domain.CandidatoOferta{{
-				Produto: "Feijão", Valor: 5, Quantidade: 1, Medida: "unidade", DataExpiracao: "2026-07-25",
+				Produto: "Feijão", Valor: 5, Quantidade: 1, Medida: "unidade",
+				DataInicio: "2026-07-18", DataExpiracao: "2026-07-25",
 			}}},
 			n: &calls,
 		},
@@ -336,7 +364,8 @@ func TestRunDailyJob_MaxDocumentos(t *testing.T) {
 		Raster: raster.Fixed{Pages: []domain.PageImage{{Page: 1, JPEG: []byte{0xff, 0xd8}}}},
 		Extrator: &countingExtrator{
 			inner: extrator.Stub{Candidatos: []domain.CandidatoOferta{{
-				Produto: "Leite", Valor: 4, Quantidade: 1000, Medida: "ml", DataExpiracao: "2026-07-25",
+				Produto: "Leite", Valor: 4, Quantidade: 1000, Medida: "ml",
+				DataInicio: "2026-07-18", DataExpiracao: "2026-07-25",
 			}}},
 			n: &calls,
 		},
@@ -386,7 +415,8 @@ func TestRunDailyJob_SkipsParcial(t *testing.T) {
 		Raster: raster.Fixed{Pages: []domain.PageImage{{Page: 1, JPEG: []byte{1}}}},
 		Extrator: &countingExtrator{
 			inner: extrator.Stub{Candidatos: []domain.CandidatoOferta{{
-				Produto: "X", Valor: 1, Quantidade: 1, Medida: "unidade", DataExpiracao: "2026-07-25",
+				Produto: "X", Valor: 1, Quantidade: 1, Medida: "unidade",
+				DataInicio: "2026-07-18", DataExpiracao: "2026-07-25",
 			}}},
 			n: &calls,
 		},

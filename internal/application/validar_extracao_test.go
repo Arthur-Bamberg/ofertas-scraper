@@ -8,11 +8,10 @@ import (
 )
 
 type stubDateParser struct {
-	date string
-	ok   bool
+	v domain.FilenameVigencia
 }
 
-func (s stubDateParser) Parse(string) (string, bool) { return s.date, s.ok }
+func (s stubDateParser) Parse(string) domain.FilenameVigencia { return s.v }
 
 func TestValidarExtracao_listaVaziaEhFalhou(t *testing.T) {
 	_, falhas, estado := application.ValidarExtracao(nil)
@@ -26,8 +25,8 @@ func TestValidarExtracao_listaVaziaEhFalhou(t *testing.T) {
 
 func TestValidarExtracao_mistoParcial(t *testing.T) {
 	candidatos := []domain.CandidatoOferta{
-		{Produto: "Arroz", Valor: 10, Quantidade: 1000, Medida: "g", DataExpiracao: "2026-07-20"},
-		{Produto: "Feijão", Valor: 8, Quantidade: 1, Medida: "kg", DataExpiracao: "2026-07-20"},
+		{Produto: "Arroz", Valor: 10, Quantidade: 1000, Medida: "g", DataInicio: "2026-07-18", DataExpiracao: "2026-07-20"},
+		{Produto: "Feijão", Valor: 8, Quantidade: 1, Medida: "kg", DataInicio: "2026-07-18", DataExpiracao: "2026-07-20"},
 	}
 	validas, falhas, estado := application.ValidarExtracao(candidatos)
 	if len(validas) != 1 || len(falhas) != 1 {
@@ -38,18 +37,72 @@ func TestValidarExtracao_mistoParcial(t *testing.T) {
 	}
 }
 
-func TestAplicarFallbackDataExpiracao(t *testing.T) {
-	c := domain.CandidatoOferta{Produto: "X", Valor: 1, Quantidade: 1, Medida: "unidade"}
-	fonte := domain.Fonte{FallbackDataExpiracaoFilename: true}
-	got := application.AplicarFallbackDataExpiracao(c, fonte, "encarte-2026-07-25.pdf", stubDateParser{date: "2026-07-25", ok: true})
-	if got.DataExpiracao != "2026-07-25" {
-		t.Fatalf("got %q", got.DataExpiracao)
+func TestResolverVigencia_cascata(t *testing.T) {
+	parser := stubDateParser{v: domain.FilenameVigencia{
+		DataInicio: "2026-07-18", DataExpiracao: "2026-07-19",
+	}}
+
+	semDatas := domain.CandidatoOferta{Produto: "X", Valor: 1, Quantidade: 1, Medida: "unidade"}
+	got := application.ResolverVigencia(semDatas, "MS_Fort_FDS_18-e-19_JUL_26.pdf", parser, "2026-07-10")
+	if got.Candidato.DataInicio != "2026-07-18" || got.OrigemDataInicio != domain.OrigemFilename {
+		t.Fatalf("inicio filename: %#v", got)
+	}
+	if got.Candidato.DataExpiracao != "2026-07-19" || got.OrigemDataExpiracao != domain.OrigemFilename {
+		t.Fatalf("fim filename: %#v", got)
 	}
 
-	comExtrator := c
-	comExtrator.DataExpiracao = "2026-07-01"
-	got = application.AplicarFallbackDataExpiracao(comExtrator, fonte, "encarte-2026-07-25.pdf", stubDateParser{date: "2026-07-25", ok: true})
-	if got.DataExpiracao != "2026-07-01" {
-		t.Fatalf("Extrator deve vencer, got %q", got.DataExpiracao)
+	comExtrator := semDatas
+	comExtrator.DataInicio = "2026-07-01"
+	comExtrator.DataExpiracao = "2026-07-31"
+	got = application.ResolverVigencia(comExtrator, "x.pdf", parser, "2026-07-10")
+	if got.Candidato.DataInicio != "2026-07-01" || got.OrigemDataInicio != domain.OrigemExtrator {
+		t.Fatalf("extrator vence inicio: %#v", got)
+	}
+	if got.Candidato.DataExpiracao != "2026-07-31" || got.OrigemDataExpiracao != domain.OrigemExtrator {
+		t.Fatalf("extrator vence fim: %#v", got)
+	}
+
+	soISO := stubDateParser{v: domain.FilenameVigencia{DataExpiracao: "2026-07-25"}}
+	got = application.ResolverVigencia(semDatas, "encarte-20260725.pdf", soISO, "2026-07-10")
+	if got.Candidato.DataInicio != "2026-07-10" || got.OrigemDataInicio != domain.OrigemPrimeiraDescoberta {
+		t.Fatalf("primeira descoberta: %#v", got)
+	}
+	if got.Candidato.DataExpiracao != "2026-07-25" || got.OrigemDataExpiracao != domain.OrigemFilename {
+		t.Fatalf("iso como fim: %#v", got)
+	}
+}
+
+func TestValidarExtracaoResolvida_preservaOrigens(t *testing.T) {
+	resolvidos := []application.CandidatoResolvido{{
+		Candidato: domain.CandidatoOferta{
+			Produto: "Arroz", Valor: 10, Quantidade: 1000, Medida: "g",
+			DataInicio: "2026-07-18", DataExpiracao: "2026-07-19",
+		},
+		OrigemDataInicio:    domain.OrigemFilename,
+		OrigemDataExpiracao: domain.OrigemFilename,
+	}}
+	validas, falhas, estado := application.ValidarExtracaoResolvida(resolvidos)
+	if len(validas) != 1 || len(falhas) != 0 || estado != domain.EstadoConcluido {
+		t.Fatalf("validas=%d falhas=%d estado=%s", len(validas), len(falhas), estado)
+	}
+	if validas[0].OrigemDataInicio != domain.OrigemFilename || validas[0].OrigemDataExpiracao != domain.OrigemFilename {
+		t.Fatalf("origens=%s/%s", validas[0].OrigemDataInicio, validas[0].OrigemDataExpiracao)
+	}
+}
+
+func TestValidarExtracaoResolvida_fimAusenteEhFalha(t *testing.T) {
+	resolvidos := []application.CandidatoResolvido{{
+		Candidato: domain.CandidatoOferta{
+			Produto: "Arroz", Valor: 10, Quantidade: 1000, Medida: "g",
+			DataInicio: "2026-07-18",
+		},
+		OrigemDataInicio: domain.OrigemPrimeiraDescoberta,
+	}}
+	validas, falhas, estado := application.ValidarExtracaoResolvida(resolvidos)
+	if len(validas) != 0 || len(falhas) != 1 || estado != domain.EstadoFalhou {
+		t.Fatalf("validas=%d falhas=%d estado=%s", len(validas), len(falhas), estado)
+	}
+	if falhas[0].Codigo != domain.CodigoDataExpiracaoInvalida {
+		t.Fatalf("codigo=%s", falhas[0].Codigo)
 	}
 }

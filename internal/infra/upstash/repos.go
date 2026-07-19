@@ -25,6 +25,9 @@ func marcaNormKey(norm string) string   { return "marca:norm:" + norm }
 func documentoIDKey(fonteID domain.FonteID, filename, dia string) string {
 	return fmt.Sprintf("documento:id:%s:%s:%s", fonteID, filename, dia)
 }
+func documentoDiasKey(fonteID domain.FonteID, filename string) string {
+	return fmt.Sprintf("documento:dias:%s:%s", fonteID, filename)
+}
 func ofertasDocKey(id domain.DocumentoID) string { return "ofertas:documento:" + string(id) }
 func falhasDocKey(id domain.DocumentoID) string  { return "falhas:documento:" + string(id) }
 
@@ -202,7 +205,27 @@ func (r *DocumentoRepo) Save(ctx context.Context, d domain.Documento) error {
 	if err := r.c.Set(ctx, documentoKey(d.ID), string(b)); err != nil {
 		return err
 	}
-	return r.c.Set(ctx, documentoIDKey(d.FonteID, d.Filename, d.Dia), string(d.ID))
+	if err := r.c.Set(ctx, documentoIDKey(d.FonteID, d.Filename, d.Dia), string(d.ID)); err != nil {
+		return err
+	}
+	return r.c.SAdd(ctx, documentoDiasKey(d.FonteID, d.Filename), d.Dia)
+}
+
+func (r *DocumentoRepo) EarliestDia(ctx context.Context, fonteID domain.FonteID, filename string) (string, bool, error) {
+	dias, err := r.c.SMembers(ctx, documentoDiasKey(fonteID, filename))
+	if err != nil {
+		return "", false, err
+	}
+	if len(dias) == 0 {
+		return "", false, nil
+	}
+	earliest := dias[0]
+	for _, d := range dias[1:] {
+		if d < earliest {
+			earliest = d
+		}
+	}
+	return earliest, true, nil
 }
 
 type OfertaRepo struct{ c *Client }

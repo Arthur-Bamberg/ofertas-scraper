@@ -78,6 +78,65 @@ func TestMercadoRepo_SaveGetList(t *testing.T) {
 	}
 }
 
+func TestDocumentoRepo_EarliestDia(t *testing.T) {
+	store := map[string]string{}
+	sets := map[string]map[string]struct{}{}
+	var mu sync.Mutex
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var cmd []any
+		if err := json.NewDecoder(r.Body).Decode(&cmd); err != nil {
+			t.Fatal(err)
+		}
+		mu.Lock()
+		defer mu.Unlock()
+		switch cmd[0].(string) {
+		case "SET":
+			store[cmd[1].(string)] = cmd[2].(string)
+			writeResult(w, "OK")
+		case "SADD":
+			key := cmd[1].(string)
+			if sets[key] == nil {
+				sets[key] = map[string]struct{}{}
+			}
+			sets[key][cmd[2].(string)] = struct{}{}
+			writeResult(w, 1)
+		case "SMEMBERS":
+			key := cmd[1].(string)
+			var members []string
+			for m := range sets[key] {
+				members = append(members, m)
+			}
+			b, _ := json.Marshal(members)
+			writeRaw(w, string(b))
+		default:
+			t.Fatalf("unexpected op %s", cmd[0])
+		}
+	}))
+	defer srv.Close()
+
+	repo := upstash.NewDocumentoRepo(upstash.NewClient(srv.URL, "t", srv.Client()))
+	ctx := context.Background()
+	fonte := domain.FonteID("fonte-fort")
+	file := "RS_Fort_FDS_Regional_18-e-19_JUL_26-Canoas-Final.pdf"
+
+	if err := repo.Save(ctx, domain.Documento{
+		ID: "d2", FonteID: fonte, Filename: file, Dia: "2026-07-18", Estado: domain.EstadoConcluido,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if err := repo.Save(ctx, domain.Documento{
+		ID: "d1", FonteID: fonte, Filename: file, Dia: "2026-07-10", Estado: domain.EstadoFalhou,
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	dia, ok, err := repo.EarliestDia(ctx, fonte, file)
+	if err != nil || !ok || dia != "2026-07-10" {
+		t.Fatalf("earliest=%q ok=%v err=%v", dia, ok, err)
+	}
+}
+
 func TestOfertaRepo_SaveAllReplacesIncludingEmpty(t *testing.T) {
 	store := map[string]string{}
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

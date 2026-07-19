@@ -5,7 +5,7 @@
   "description": "Extrator candidate before domain match-or-create (produto/marca labels, not ids)",
   "type": "object",
   "additionalProperties": false,
-  "required": ["produto", "valor", "quantidade", "medida", "dataExpiracao"],
+  "required": ["produto", "valor", "quantidade", "medida", "dataInicio", "dataExpiracao"],
   "properties": {
     "produto": {
       "type": "string",
@@ -37,6 +37,11 @@
       "type": "string",
       "enum": ["g", "ml", "unidade"],
       "description": "Always normalized by Extrator: kg→1000g, L→1000ml"
+    },
+    "dataInicio": {
+      "type": "string",
+      "format": "date",
+      "description": "Start of flyer validity for this Oferta (YYYY-MM-DD); may be in the future"
     },
     "dataExpiracao": {
       "type": "string",
@@ -70,6 +75,15 @@
           "required": ["promocaoCartao", "valorPromocional"],
           "properties": {
             "promocaoCartao": { "const": true },
+            "valorPromocional": { "type": "number", "exclusiveMinimum": 0 }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["promocaoClube", "valorPromocional"],
+          "properties": {
+            "promocaoClube": { "const": true },
             "valorPromocional": { "type": "number", "exclusiveMinimum": 0 }
           }
         }

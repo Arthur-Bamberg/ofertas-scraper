@@ -1,5 +1,5 @@
 ---
-status: superseded by ADR-0025
+status: superseded by ADR-0028
 ---
 
 # dataExpiracao prefers Extrator; optional filename fallback per Fonte
